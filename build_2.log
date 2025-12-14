@@ -1,0 +1,32 @@
+
+> app@0.1.0 build
+> next build
+
+   笆ｲ Next.js 16.0.10 (Turbopack)
+
+   Creating an optimized production build ...
+ 笨・Compiled successfully in 7.1s
+   Running TypeScript ...
+   Collecting page data using 15 workers ...
+GOOGLE_MAPS_API_KEY is not set.
+GOOGLE_MAPS_API_KEY is not set.
+   Generating static pages using 15 workers (0/6) ...
+GOOGLE_MAPS_API_KEY is not set.
+   Generating static pages using 15 workers (1/6) 
+   Generating static pages using 15 workers (2/6) 
+   Generating static pages using 15 workers (4/6) 
+ 笨・Generating static pages using 15 workers (6/6) in 1105.2ms
+   Finalizing page optimization ...
+
+Route (app)
+笏・笳・/
+笏・笳・/_not-found
+笏・ﾆ・/api/search
+笏・ﾆ・/api/shop/[id]
+笏・笳・/search
+笏・ﾆ・/shop/[id]
+
+
+笳・ (Static)   prerendered as static content
+ﾆ・ (Dynamic)  server-rendered on demand
+

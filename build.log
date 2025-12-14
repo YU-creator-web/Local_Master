@@ -1,0 +1,22 @@
+
+> app@0.1.0 build
+> next build
+
+   笆ｲ Next.js 16.0.10 (Turbopack)
+
+   Creating an optimized production build ...
+ 笨・Compiled successfully in 6.0s
+   Running TypeScript ...
+Failed to compile.
+
+./src/components/canvas/Particles.tsx:57:10
+Type error: Property 'args' is missing in type '{ attach: string; count: number; array: Float32Array<ArrayBuffer>; itemSize: number; }' but required in type 'Mutable<Overwrite<Partial<Overwrite<BufferAttribute, MathProps<BufferAttribute> & ReactProps<BufferAttribute>>>, Omit<...>>>'.
+
+  55 |     <points ref={mesh}>
+  56 |       <bufferGeometry>
+> 57 |         <bufferAttribute
+     |          ^
+  58 |           attach="attributes-position"
+  59 |           count={positions.length / 3}
+  60 |           array={positions}
+Next.js build worker exited with code: 1 and signal: null

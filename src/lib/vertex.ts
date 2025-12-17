@@ -1,33 +1,26 @@
-import { VertexAI, GenerativeModel } from '@google-cloud/vertexai';
+import { GoogleGenAI } from '@google/genai';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT;
-// Reverting to us-central1 as global failed (returned HTML 404)
-const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-const MODEL_ID = 'gemini-2.5-pro';
+// Gemini 3 requires global location
+const LOCATION = 'global';
+const MODEL_ID = 'gemini-3-pro-preview';
 
-let vertexAI: VertexAI | null = null;
-let model: GenerativeModel | null = null;
+let aiClient: GoogleGenAI | null = null;
 
-function getModel() {
-  if (!model) {
+function getClient() {
+  if (!aiClient) {
     if (!PROJECT_ID) {
       console.warn("GOOGLE_CLOUD_PROJECT is not set. AI features will fail.");
       return null;
     }
-    console.log(`🚀 Initializing Vertex AI (Strict Mode). Project: ${PROJECT_ID}, Location: ${LOCATION}, Model: ${MODEL_ID}`);
-    vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
-    model = vertexAI.getGenerativeModel({ 
-      model: MODEL_ID,
-      generationConfig: {
-        maxOutputTokens: 8192,
-      },
-      tools: [{
-        // @ts-ignore
-        googleSearch: {}
-      }]
+    console.log(`🚀 Initializing Google Gen AI (Gemini 3). Project: ${PROJECT_ID}, Location: ${LOCATION}, Model: ${MODEL_ID}`);
+    aiClient = new GoogleGenAI({
+      vertexai: true,
+      project: PROJECT_ID,
+      location: LOCATION
     });
   }
-  return model;
+  return aiClient;
 }
 
 function cleanJson(text: string): string {
@@ -36,7 +29,6 @@ function cleanJson(text: string): string {
   if (match && match[1]) return match[1].trim();
 
   // 2. Try to find strictly valid JSON object structure { ... }
-  // This helps when AI outputs conversational text + JSON without code blocks
   match = text.match(/(\{[\s\S]*\})/);
   if (match && match[1]) return match[1].trim();
 
@@ -44,18 +36,12 @@ function cleanJson(text: string): string {
   return text.replace(/```json/g, '').replace(/```/g, '').trim();
 }
 
-// Helper to extract text from all parts of the response candidates
-function extractResponseText(response: any): string {
-    const parts = response.candidates?.[0]?.content?.parts || [];
-    return parts.map((p: any) => p.text || "").join("").trim();
-}
-
 export type OldShopScoreResult = {
   score: number;
   reasoning: string;
   short_summary: string;
   is_shinise: boolean;
-  founding_year: string; // 創業年（例: "1965年"）または "不明"
+  founding_year: string;
 };
 
 export type ShopGuideResult = {
@@ -71,8 +57,8 @@ export async function generateOldShopScore(shop: {
   reviews?: string[];
   types?: string[];
 }): Promise<OldShopScoreResult> {
-  const generativeModel = getModel();
-  if (!generativeModel) {
+  const ai = getClient();
+  if (!ai) {
     return { score: 0, reasoning: "AI configuration missing", short_summary: "AI未接続", is_shinise: false, founding_year: "不明" };
   }
 
@@ -84,7 +70,6 @@ export async function generateOldShopScore(shop: {
     【判定基準】
     - 単なる営業年数だけでなく、「語られ方」を重視する。
     - 「地元で愛されている」「昭和の雰囲気」「代々受け継がれる味」「看板娘/名物店主」などのナラティブな要素を高く評価する。
-    - チェーン店は低く評価する。
     - スコアは0〜100点。80点以上は「認定老舗」。
     - **創業年はWEB検索で必ず調査してください**。見つからない場合は「不明」としてください。
 
@@ -105,29 +90,37 @@ export async function generateOldShopScore(shop: {
   `;
 
   try {
-    const result = await generativeModel.generateContent(prompt);
+    const response = await ai.models.generateContent({
+      model: MODEL_ID,
+      contents: prompt,
+      config: {
+        tools: [{
+          googleSearch: {}
+        }],
+        responseMimeType: 'application/json'
+      }
+    });
     
-    console.log("DEBUG: Full Vertex Response:", JSON.stringify(result.response, null, 2));
+    // Log grounding metadata for debugging
+    const groundingMetadata = (response as any).candidates?.[0]?.groundingMetadata;
+    if (groundingMetadata?.webSearchQueries) {
+      console.log(`🔍 [Web Grounding] Score Queries: ${JSON.stringify(groundingMetadata.webSearchQueries)}`);
+    }
 
-    const text = extractResponseText(result.response);
+    const text = response.text;
     
     if (!text) {
-      console.warn("DEBUG: No text in response parts:", result.response.candidates?.[0].content.parts);
       throw new Error("No text response from Vertex AI");
     }
 
-    console.log("DEBUG: Raw AI Response (Score):", JSON.stringify(text)); 
+    console.log("DEBUG: Raw AI Response (Score):", text.substring(0, 100) + "..."); 
+    
+    // Fix: Apply cleanJson before parsing
     const cleanText = cleanJson(text);
-    console.log("DEBUG: Cleaned JSON:", JSON.stringify(cleanText));
-
-    if (!cleanText) {
-        throw new Error("Empty JSON after cleaning");
-    }
-
     return JSON.parse(cleanText) as OldShopScoreResult;
+
   } catch (error: any) {
-    console.error("Vertex AI strict error:", error);
-    // Return explicit error state for debugging
+    console.error("Gemini 3 error (Score):", error);
     return {
       score: 0,
       reasoning: `AIエラー: ${error.message || "Unknown"}`,
@@ -144,8 +137,8 @@ export async function generateShopGuide(shop: {
   reviews?: string[];
   types?: string[];
 }): Promise<ShopGuideResult> {
-  const generativeModel = getModel();
-  if (!generativeModel) {
+  const ai = getClient();
+  if (!ai) {
     return {
       history_background: "AI接続エラー",
       recommended_points: "",
@@ -175,27 +168,35 @@ export async function generateShopGuide(shop: {
   `;
 
   try {
-    const result = await generativeModel.generateContent(prompt);
-    
-    console.log("DEBUG: Full Vertex Response (Guide):", JSON.stringify(result.response, null, 2));
+    const response = await ai.models.generateContent({
+      model: MODEL_ID,
+      contents: prompt,
+      config: {
+        tools: [{
+          googleSearch: {}
+        }],
+        responseMimeType: 'application/json'
+      }
+    });
 
-    const text = extractResponseText(result.response);
+    const groundingMetadata = (response as any).candidates?.[0]?.groundingMetadata;
+    if (groundingMetadata?.webSearchQueries) {
+      console.log(`🔍 [Web Grounding] Guide Queries: ${JSON.stringify(groundingMetadata.webSearchQueries)}`);
+    }
+
+    const text = response.text;
     
     if (!text) {
-      console.warn("DEBUG: No text in response parts (Guide):", result.response.candidates?.[0].content.parts);
       throw new Error("No text response from Vertex AI");
     }
 
-    console.log("DEBUG: Raw AI Response (Guide):", JSON.stringify(text));
+    console.log("DEBUG: Raw AI Response (Guide):", text.substring(0, 100) + "...");
+    
+    // Fix: Apply cleanJson before parsing
     const cleanText = cleanJson(text);
-
-    if (!cleanText) {
-        throw new Error("Empty JSON after cleaning");
-    }
-
     return JSON.parse(cleanText) as ShopGuideResult;
   } catch (error: any) {
-    console.error("Vertex AI strict error:", error);
+    console.error("Gemini 3 error (Guide):", error);
     return {
       history_background: `エラー: ${error.message}`,
       recommended_points: "",
@@ -206,9 +207,8 @@ export async function generateShopGuide(shop: {
 }
 
 export async function findShiniseCandidates(stationName: string, genre?: string): Promise<string[]> {
-  const generativeModel = getModel();
-  if (!generativeModel) {
-    console.error("Vertex AI not initialized for candidate search");
+  const ai = getClient();
+  if (!ai) {
     return [];
   }
 
@@ -226,47 +226,46 @@ export async function findShiniseCandidates(stationName: string, genre?: string)
         2. **地域密着型**（地元の人に愛されている）
         3. **チェーン店は絶対に除外**してください（大手資本が入っていない個店を優先）。
     
-    【優先順位（重要）】
-    - **食べログ等のグルメサイトで評価が高い順**（3.5以上を優先）に選出してください。
-    - 口コミ数が多い店を優先してください。
-    
-    【除外対象】
-    - 全国展開しているチェーン店
-    - フランチャイズ店
-    - 商業施設内のフードコート（単独店舗ならOKだが、路面店を優先）
-    - 閉店した店舗
+    【重要: WEB検索を活用】
+    - 必ずWEB検索を行い、現在も営業している店を選んでください。
+    - 食べログ等の評価も参照してください。
 
     【出力形式: JSON】
-    以下のフォーマットで、店名のみを配列で返してください。余計な説明は不要です。
     {
-      "candidates": [
-        "店名A",
-        "店名B",
-        ...
-      ]
+      "candidates": [ "店名A", "店名B", ... ]
     }
   `;
 
   try {
-    const result = await generativeModel.generateContent(prompt);
+    const response = await ai.models.generateContent({
+      model: MODEL_ID,
+      contents: prompt,
+      config: {
+        tools: [{
+          googleSearch: {}
+        }],
+        responseMimeType: 'application/json'
+      }
+    });
     
-    const text = extractResponseText(result.response);
-    
-    if (!text) {
-        throw new Error("No candidates text from Vertex AI");
+    const groundingMetadata = (response as any).candidates?.[0]?.groundingMetadata;
+    if (groundingMetadata?.webSearchQueries) {
+      console.log(`🔍 [Web Grounding] Candidates Queries: ${JSON.stringify(groundingMetadata.webSearchQueries)}`);
     }
 
-    console.log("DEBUG: Raw Candidates Response:", JSON.stringify(text));
+    const text = response.text;
+    
+    if (!text) throw new Error("No candidates text from Vertex AI");
+
+    console.log("DEBUG: Raw Candidates Response:", text.substring(0, 100) + "...");
+    
+    // Fix: Apply cleanJson before parsing
     const cleanText = cleanJson(text);
-    console.log("DEBUG: Cleaned Candidates JSON:", cleanText);
-
-    if (!cleanText) return [];
-
     const parsed = JSON.parse(cleanText) as { candidates: string[] };
     return parsed.candidates || [];
 
   } catch (error: any) {
-    console.error("Vertex AI Candidate Search Error:", error);
+    console.error("Gemini 3 Candidate Search Error:", error);
     return [];
   }
 }

@@ -1,7 +1,7 @@
 # Ticket: データ永続化 & 認証 (Firebase)
 
 **ID**: T-005-Data
-**Status**: Pending
+**Status**: Complete
 
 ## 目標 (Goal)
 Firebaseを使用した認証機能と、ユーザーメモの保存機能を実装する。

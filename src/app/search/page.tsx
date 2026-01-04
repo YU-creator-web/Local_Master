@@ -4,16 +4,20 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button, Card } from '@/components/ui/Components';
 import { Header } from '@/components/ui/Header';
+import { ThreeCanvas } from '@/components/canvas/Scene';
+import { GoldParticles } from '@/components/canvas/Particles';
 
 interface Shop {
   id: string;
   displayName: { text: string };
   formattedAddress: string;
   photos?: { name: string }[];
+  types?: string[];
   aiAnalysis?: {
     score: number;
     short_summary: string;
     founding_year: string;
+    tabelog_rating?: number;
   };
 }
 
@@ -27,65 +31,154 @@ function SearchResults() {
 
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchStatus, setSearchStatus] = useState('老舗の歴史を紐解いています...');
   const [error, setError] = useState('');
 
+  // Function to process NDJSON stream
+  const fetchStream = async (url: string) => {
+    setLoading(true);
+    setError('');
+    setShops([]);
+    setSearchStatus('検索を開始します...');
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch stream');
+        
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('No reader available');
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+
+            // Process all complete lines
+            buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const event = JSON.parse(line);
+                    
+                    if (event.type === 'status') {
+                        setSearchStatus(event.message);
+                    } else if (event.type === 'shop') {
+                        setShops(prev => {
+                            // Deduplicate just in case (though unlikely with current API)
+                            if (prev.find(s => s.id === event.data.id)) return prev;
+                            const newShops = [...prev, event.data];
+                            // Sort by score desc as they come in? 
+                            // Or just append. Appending is better for stability, 
+                            // but sorting is better for quality.
+                            // Let's sort to keep the "Best" on top.
+                            return newShops.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
+                        });
+                    } else if (event.type === 'error') {
+                        setError(event.message);
+                    } else if (event.type === 'complete') {
+                        setLoading(false);
+                    }
+                } catch (e) {
+                    console.error('JSON Parse Error:', e);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Stream Error:', err);
+        setError('通信エラーが発生しました。');
+        setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchShops = async () => {
-      setLoading(true);
-      setError('');
-      try {
+    if (station || (lat && lng)) {
         const query = [
             station && `station=${encodeURIComponent(station)}`,
             lat && lng && `lat=${lat}&lng=${lng}`,
             genre && `genre=${encodeURIComponent(genre)}`
         ].filter(Boolean).join('&');
-          
-        const res = await fetch(`/api/search?${query}`);
-        if (!res.ok) throw new Error('Failed to fetch');
-        const data = await res.json();
-        setShops((data.shops as Shop[]) || []);
-      } catch (err) {
-        setError('店舗の取得に失敗しました。');
-      } finally {
+        
+        fetchStream(`/api/search?${query}`);
+    } else {
         setLoading(false);
-      }
-    };
-
-    if (station || (lat && lng)) {
-      fetchShops();
     }
   }, [station, lat, lng, genre]);
 
+  const handleResearch = () => {
+    if (station || (lat && lng)) {
+        const query = [
+            station && `station=${encodeURIComponent(station)}`,
+            lat && lng && `lat=${lat}&lng=${lng}`,
+            genre && `genre=${encodeURIComponent(genre)}`,
+            'force=true'
+        ].filter(Boolean).join('&');
+        
+        fetchStream(`/api/search?${query}`);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#1a0f0a] text-[#FAFAFA] font-[family-name:var(--font-sans)] pb-20">
+    <div className="min-h-screen bg-[#1a0f0a] text-[#FAFAFA] font-[family-name:var(--font-sans)] pb-20 relative">
+      <div className="absolute inset-0 z-0 opacity-30 pointer-events-none fixed">
+        <ThreeCanvas>
+          <GoldParticles />
+        </ThreeCanvas>
+      </div>
+
       <Header />
 
-      {/* Responsive container: full width with max, padding for breathing room */}
+      {/* Responsive container */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <h2 className="text-xl md:text-2xl mb-6 font-bold border-b border-[#D4AF37] inline-block pb-2 font-[family-name:var(--font-mincho)] text-white drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]">
-          {station ? `${station} ` : '現在地'} 
-          {genre ? `× ${genre}` : ''} 周辺の候補
-        </h2>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-4 border-b border-[#D4AF37]/30">
+            <h2 className="text-xl md:text-2xl font-bold font-[family-name:var(--font-mincho)] text-white drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]">
+            {station ? `${station} ` : '現在地'} 
+            {genre ? `× ${genre}` : ''} 周辺の候補
+            </h2>
+            
+            {!loading && (
+                <Button 
+                    onClick={handleResearch} 
+                    className="mt-4 md:mt-0 text-sm font-bold py-3 px-8 rounded-full shadow-[0_4px_15px_rgba(212,175,55,0.4)] transition-all hover:scale-105 active:scale-95 border-none relative overflow-hidden group"
+                    style={{ 
+                        background: 'linear-gradient(135deg, #FFD700 0%, #D4AF37 50%, #B8860B 100%)',
+                        color: '#1a0f0a',
+                        zIndex: 50
+                    }}
+                >
+                    <span className="relative z-10 flex items-center">
+                        情報を更新して再検索
+                        <span className="absolute inset-0 bg-white/30 skew-x-12 -translate-x-full group-hover:animate-[shimmer_1s_infinite] w-full h-full block transform origin-left" style={{ filter: 'blur(5px)' }}></span>
+                    </span>
+                </Button>
+            )}
+        </div>
 
+        {/* Loading Indicator (Top) - Shows status message */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20 space-y-4">
-             <div className="w-16 h-16 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin"></div>
-             <p className="animate-pulse text-sm text-[#D4AF37]">老舗の歴史を紐解いています...</p>
+          <div className="flex items-center space-x-3 mb-6 bg-[#D4AF37]/10 p-4 rounded-lg border border-[#D4AF37]/30 animate-pulse">
+             <div className="w-5 h-5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin"></div>
+             <p className="text-sm text-[#D4AF37]">{searchStatus}</p>
           </div>
         )}
 
-        {error && <p className="text-red-500 text-center">{error}</p>}
+        {error && <p className="text-red-500 text-center mb-6">{error}</p>}
 
         {!loading && !error && shops.length === 0 && (
           <p className="text-center py-20 opacity-60">老舗が見つかりませんでした。</p>
         )}
 
-        {/* Responsive Grid: 1 col on mobile, 2 on md, 3 on lg */}
+        {/* Responsive Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {!loading && shops.map((shop) => (
+            {shops.map((shop) => (
             <Card key={shop.id} className="cursor-pointer group bg-white/5 border border-white/10 backdrop-blur-sm overflow-hidden rounded-xl transition-all duration-300 hover:bg-white/10 hover:border-[#D4AF37]/50 hover:shadow-[0_0_20px_rgba(212,175,55,0.1)]" onClick={() => router.push(`/shop/${shop.id}`)}>
                 <div className="relative h-40 bg-black/50 overflow-hidden">
-                    {/* Image Placeholder or Photo */}
+                    {/* Image */}
                     {shop.photos && shop.photos.length > 0 ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
@@ -100,12 +193,25 @@ function SearchResults() {
                         </div>
                     )}
                     
-                    {/* Score Badge */}
-                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur px-3 py-1 rounded-full border border-[#D4AF37]/50 shadow-lg">
-                        <span className="text-[10px] font-bold block text-center text-[#D4AF37]">老舗度</span>
-                        <span className="text-xl font-bold text-white">
-                            {shop.aiAnalysis?.score ? shop.aiAnalysis.score : '-'}
-                        </span>
+                    {/* Score Badges */}
+                    <div className="absolute top-2 right-2 flex gap-2">
+                        {/* Gourmet Score (New) */}
+                        {shop.aiAnalysis?.tabelog_rating && shop.aiAnalysis.tabelog_rating > 0 && (
+                             <div className="bg-black/80 backdrop-blur px-3 py-1 rounded-full border border-orange-500/50 shadow-lg">
+                                <span className="text-[10px] font-bold block text-center text-orange-500">グルメ度</span>
+                                <span className="text-xl font-bold text-white">
+                                    {(shop.aiAnalysis.tabelog_rating * 30).toFixed(0)}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Shinise Score */}
+                        <div className="bg-black/80 backdrop-blur px-3 py-1 rounded-full border border-[#D4AF37]/50 shadow-lg">
+                            <span className="text-[10px] font-bold block text-center text-[#D4AF37]">老舗度</span>
+                            <span className="text-xl font-bold text-white">
+                                {shop.aiAnalysis?.score ? shop.aiAnalysis.score : '-'}
+                            </span>
+                        </div>
                     </div>
                 </div>
                 
@@ -140,7 +246,7 @@ function SearchResults() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="p-10 text-center">Loading...</div>}>
+    <Suspense fallback={<div className="p-10 text-center text-[#D4AF37]">Loading Search...</div>}>
       <SearchResults />
     </Suspense>
   );

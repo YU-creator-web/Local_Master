@@ -4,46 +4,43 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-export const GoldParticles = ({ count = 500 }) => {
+// Individual Particle Group Component
+const ParticleGroup = ({ count, size, speedFactor, opacity }: { count: number, size: number, speedFactor: number, opacity: number }) => {
   const mesh = useRef<THREE.Points>(null);
-  
-  // Create random positions and speeds for particles
-  const particles = useMemo(() => {
-    const temp = [];
-    for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * 10;
-      const y = (Math.random() - 0.5) * 10;
-      const z = (Math.random() - 0.5) * 10;
-      const speed = Math.random() * 0.002;
-      temp.push({ x, y, z, speed, initialY: y });
-    }
-    return temp;
-  }, [count]);
 
-  const positions = useMemo(() => {
+  const { positions, speeds } = useMemo(() => {
     const pos = new Float32Array(count * 3);
-    particles.forEach((p, i) => {
-      pos[i * 3] = p.x;
-      pos[i * 3 + 1] = p.y;
-      pos[i * 3 + 2] = p.z;
-    });
-    return pos;
-  }, [count, particles]);
+    const spd = new Float32Array(count);
+    
+    for (let i = 0; i < count; i++) {
+        pos[i * 3] = (Math.random() - 0.5) * 15; // Spread wider
+        pos[i * 3 + 1] = (Math.random() - 0.5) * 15;
+        pos[i * 3 + 2] = (Math.random() - 0.5) * 10;
+        
+        spd[i] = (Math.random() * 0.005 + 0.002) * speedFactor; // Random speed
+    }
+    return { positions: pos, speeds: spd };
+  }, [count, speedFactor]);
 
   useFrame((state) => {
     if (mesh.current) {
-        // Rotate the entire cloud slowly
-        mesh.current.rotation.y += 0.0005;
-        
-        // Update individual y positions for a "rising" or "floating" effect
+        // Gentle rotation
+        mesh.current.rotation.y += 0.0003 * speedFactor;
+        mesh.current.rotation.x += 0.0001 * speedFactor;
+
         const positions = mesh.current.geometry.attributes.position.array as Float32Array;
+        
         for(let i = 0; i < count; i++) {
              let y = positions[i * 3 + 1];
-             y += particles[i].speed;
+             // Float upward
+             y += speeds[i];
              
-             // Reset if too high
-             if (y > 5) {
-                 y = -5;
+             // Wrap around
+             if (y > 7) {
+                 y = -7;
+                 // Randomize x/z slightly on reset to avoid patterns
+                 positions[i * 3] = (Math.random() - 0.5) * 15;
+                 positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
              }
              positions[i * 3 + 1] = y;
         }
@@ -56,20 +53,31 @@ export const GoldParticles = ({ count = 500 }) => {
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
-          count={positions.length / 3}
-          array={positions}
-          itemSize={3}
           args={[positions, 3]}
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.03}
-        color="#FFD700" // Gold
+        size={size}
+        color="#D4AF37" // Standard Gold
         transparent
-        opacity={0.8}
+        opacity={opacity}
         sizeAttenuation={true}
         blending={THREE.AdditiveBlending}
+        depthWrite={false}
       />
     </points>
+  );
+};
+
+export const GoldParticles = () => {
+  return (
+    <group>
+        {/* Small Dust */}
+        <ParticleGroup count={400} size={0.03} speedFactor={0.8} opacity={0.6} />
+        {/* Medium Squares */}
+        <ParticleGroup count={150} size={0.08} speedFactor={1.0} opacity={0.8} />
+        {/* Large Foil */}
+        <ParticleGroup count={40} size={0.18} speedFactor={1.2} opacity={0.9} />
+    </group>
   );
 };

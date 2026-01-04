@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
-const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT;
+// [MODIFIED] Prioritizing NEXT_PUBLIC_FIREBASE_PROJECT_ID for local dev consistency
+const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
 // Gemini 3 requires global location
 const LOCATION = 'global';
 const MODEL_ID = 'gemini-3-pro-preview';
@@ -42,6 +43,7 @@ export type OldShopScoreResult = {
   short_summary: string;
   is_shinise: boolean;
   founding_year: string;
+  tabelog_rating: number; // Added
 };
 
 export type ShopGuideResult = {
@@ -49,6 +51,8 @@ export type ShopGuideResult = {
   recommended_points: string;
   atmosphere: string;
   best_time_to_visit: string;
+  tabelog_url: string;
+  smoking_status: string;
 };
 
 export async function generateOldShopScore(shop: {
@@ -59,7 +63,7 @@ export async function generateOldShopScore(shop: {
 }): Promise<OldShopScoreResult> {
   const ai = getClient();
   if (!ai) {
-    return { score: 0, reasoning: "AI configuration missing", short_summary: "AI未接続", is_shinise: false, founding_year: "不明" };
+    return { score: 0, reasoning: "AI configuration missing", short_summary: "AI未接続", is_shinise: false, founding_year: "不明", tabelog_rating: 0 };
   }
 
   const prompt = `
@@ -72,6 +76,7 @@ export async function generateOldShopScore(shop: {
     - 「地元で愛されている」「昭和の雰囲気」「代々受け継がれる味」「看板娘/名物店主」などのナラティブな要素を高く評価する。
     - スコアは0〜100点。80点以上は「認定老舗」。
     - **創業年はWEB検索で必ず調査してください**。見つからない場合は「不明」としてください。
+    - **食べログの点数（3.00〜5.00）も調査してください**。
 
     【入力情報】
     店名: ${shop.name}
@@ -85,7 +90,8 @@ export async function generateOldShopScore(shop: {
       "reasoning": "なぜそのスコアなのか、具体的なエピソードや雰囲気に触れて100文字程度で解説",
       "short_summary": "検索結果カードに表示する、情感あふれるキャッチコピー（20文字以内）",
       "is_shinise": boolean,
-      "founding_year": "創業年（例: 1965年創業）。不明な場合は『不明』と記載"
+      "founding_year": "創業年（例: 1965年創業）。不明な場合は『不明』と記載",
+      "tabelog_rating": number // 食べログの点数。見つからない場合は 0
     }
   `;
 
@@ -126,7 +132,8 @@ export async function generateOldShopScore(shop: {
       reasoning: `AIエラー: ${error.message || "Unknown"}`,
       short_summary: "判定不能",
       is_shinise: false,
-      founding_year: "不明"
+      founding_year: "不明",
+      tabelog_rating: 0
     };
   }
 }
@@ -143,14 +150,23 @@ export async function generateShopGuide(shop: {
       history_background: "AI接続エラー",
       recommended_points: "",
       atmosphere: "",
-      best_time_to_visit: ""
+      best_time_to_visit: "",
+      tabelog_url: "",
+      smoking_status: "不明"
     };
   }
 
   const prompt = `
-    あなたは「老舗鑑定の達人」です。
-    以下の店舗情報と口コミをもとに、この店の魅力を語る「店主のガイド」を作成してください。JSON形式で回答してください。
+    あなたは「老舗の魅力を伝えるガイド」です。
+    以下の店舗情報と口コミをもとに、この店の魅力を解説するコンテンツを作成してください。JSON形式で回答してください。
     ※ 本日は ${new Date().toLocaleDateString('ja-JP')} です。WEB検索を活用し、最新の情報（営業状況・メニュー・口コミ等）を反映してください。
+
+    【重要: 以下の情報を必ず検索して含めてください】
+    1. **食べログのURL**: 
+       - 「${shop.name} ${shop.address?.split(' ')[1] || ''} 食べログ」で検索し、**店名と住所が一致する確実なURL**のみを取得してください。
+       - 確信が持てない、または公式ページが見つからない場合は、無理にURLを作らず空文字 "" を返してください。
+       - 別の支店や同名の他店と間違えないよう注意してください。
+    2. **喫煙・禁煙情報**: 「全面喫煙可」「分煙」「完全禁煙」など。不明な場合は「不明」。
 
     【入力情報】
     店名: ${shop.name}
@@ -158,12 +174,19 @@ export async function generateShopGuide(shop: {
     ジャンル: ${shop.types?.join(', ') || '不明'}
     口コミ要約: ${shop.reviews?.join('\n') || 'なし'}
 
+    【記述のトーン】
+    - **「〜じゃ」「〜だぞ」といった過度なキャラ作りは不要です**。
+    - 丁寧語（〜です、〜ます）を基本とし、少し落ち着いた、教養あるガイドのような口調で記述してください。
+    - 読者が「行ってみたい」と思えるような、情緒的かつ具体的な表現を心がけてください。
+
     【出力JSONフォーマット】
     {
-      "history_background": "この店の歴史や背景について、物語調で（150文字程度）",
-      "recommended_points": "絶対に食べるべき一品や、見るべきポイント（100文字程度）",
-      "atmosphere": "店内の雰囲気や、どんな時間を過ごせるか（50文字程度）",
-      "best_time_to_visit": "おすすめの訪問時間帯や混雑状況の推測（30文字程度）"
+      "history_background": "この店の歴史や背景について。創業年やエピソードがあれば盛り込んでください（150文字程度）",
+      "recommended_points": "絶対に食べるべき一品や、見るべき建築・内装のポイント（100文字程度）",
+      "atmosphere": "店内の雰囲気、客層、過ごし方など（50文字程度）",
+      "best_time_to_visit": "おすすめの訪問時間帯や混雑状況の推測（30文字程度）",
+      "tabelog_url": "https://tabelog.com/...",
+      "smoking_status": "全面喫煙可 / 完全禁煙 / 分煙 / 不明"
     }
   `;
 
@@ -201,7 +224,9 @@ export async function generateShopGuide(shop: {
       history_background: `エラー: ${error.message}`,
       recommended_points: "",
       atmosphere: "",
-      best_time_to_visit: ""
+      best_time_to_visit: "",
+      tabelog_url: "",
+      smoking_status: "不明"
     };
   }
 }

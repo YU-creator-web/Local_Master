@@ -38,7 +38,7 @@ async function testGemini3WithLocation(location: string): Promise<boolean> {
     const text = parts.map((p: any) => p.text || '').join('');
 
     console.log('✅ 成功！');
-    console.log(`📊 モデル: ${response.modelVersion || 'N/A'}`);
+    console.log(`📊 モデル: ${JSON.stringify(response.usageMetadata) || 'N/A'}`);
     console.log('📝 レスポンス:', text.substring(0, 200) + (text.length > 200 ? '...' : ''));
     return true;
 

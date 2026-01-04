@@ -11,6 +11,8 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "mock_app",
 };
 
+
+
 // Initialize Firebase only if not already initialized
 let app;
 if (!getApps().length) {

@@ -151,7 +151,7 @@ export default function Home() {
       </main>
 
       <footer className="absolute bottom-4 text-[10px] tracking-widest text-white/60 drop-shadow-md">
-        © 2025 SINISE MASTER
+        © 2026 SINISE MASTER
       </footer>
     </div>
   );

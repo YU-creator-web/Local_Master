@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 📝 メモ機能
+    match /memos/{memoId} {
+      // 読む: IDが自分のUIDで始まる、またはデータが自分のもの
+      // (resource == null は「データが無い」状態の取得を許可するために必要)
+      allow get: if request.auth != null && (
+        resource == null || resource.data.userId == request.auth.uid
+      );
+      
+      // 一覧: 自分のデータのみ
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      
+      // 書き込み: UIDが一致すること
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // 🔍 その他（検索結果など）はAPI経由なのでAPI以外アクセス禁止
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

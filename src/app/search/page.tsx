@@ -34,64 +34,32 @@ function SearchResults() {
   const [searchStatus, setSearchStatus] = useState('老舗の歴史を紐解いています...');
   const [error, setError] = useState('');
 
-  // Function to process NDJSON stream
-  const fetchStream = async (url: string) => {
+  // Function to process JSON response
+  const fetchSearch = async (url: string) => {
     setLoading(true);
     setError('');
     setShops([]);
-    setSearchStatus('検索を開始します...');
+    setSearchStatus('老舗を検索中...🐢');
 
     try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch stream');
-        
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No reader available');
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-
-            // Process all complete lines
-            buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
-
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const event = JSON.parse(line);
-                    
-                    if (event.type === 'status') {
-                        setSearchStatus(event.message);
-                    } else if (event.type === 'shop') {
-                        setShops(prev => {
-                            // Deduplicate just in case (though unlikely with current API)
-                            if (prev.find(s => s.id === event.data.id)) return prev;
-                            const newShops = [...prev, event.data];
-                            // Sort by score desc as they come in? 
-                            // Or just append. Appending is better for stability, 
-                            // but sorting is better for quality.
-                            // Let's sort to keep the "Best" on top.
-                            return newShops.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
-                        });
-                    } else if (event.type === 'error') {
-                        setError(event.message);
-                    } else if (event.type === 'complete') {
-                        setLoading(false);
-                    }
-                } catch (e) {
-                    console.error('JSON Parse Error:', e);
-                }
-            }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch shops');
         }
+        
+        const data = await response.json();
+        
+        if (data.shops) {
+            setShops(data.shops);
+        } else {
+             setShops([]);
+        }
+
+        setLoading(false);
     } catch (err) {
-        console.error('Stream Error:', err);
-        setError('通信エラーが発生しました。');
+        console.error('Search Error:', err);
+        setError('店舗情報の取得に失敗しました。');
         setLoading(false);
     }
   };
@@ -104,7 +72,7 @@ function SearchResults() {
             genre && `genre=${encodeURIComponent(genre)}`
         ].filter(Boolean).join('&');
         
-        fetchStream(`/api/search?${query}`);
+        fetchSearch(`/api/search?${query}`);
     } else {
         setLoading(false);
     }
@@ -119,7 +87,7 @@ function SearchResults() {
             'force=true'
         ].filter(Boolean).join('&');
         
-        fetchStream(`/api/search?${query}`);
+        fetchSearch(`/api/search?${query}`);
     }
   };
 
@@ -182,9 +150,9 @@ function SearchResults() {
                     {shop.photos && shop.photos.length > 0 ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
-                            src={`https://places.googleapis.com/v1/${shop.photos[0].name}/media?maxHeightPx=400&maxWidthPx=400&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}`}
+                            src={`/api/image?name=${shop.photos[0].name}&maxWidthPx=400`}
                             alt={shop.displayName.text}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-80 group-hover:opacity-100"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                         />
                     ) : (

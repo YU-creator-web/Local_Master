@@ -76,7 +76,7 @@ function ShopDetail() {
         {shop.photos && shop.photos.length > 0 ? (
            /* eslint-disable-next-line @next/next/no-img-element */
            <img 
-             src={`https://places.googleapis.com/v1/${shop.photos[0].name}/media?maxHeightPx=1200&maxWidthPx=1200&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}`}
+             src={`/api/image?name=${shop.photos[0].name}&maxWidthPx=1200`}
              alt={shop.displayName.text}
              className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-[2000ms]"
            />
@@ -220,7 +220,7 @@ function ShopDetail() {
                         style={{ border: 0, position: 'absolute', top: 0, left: 0 }}
                         allowFullScreen
                         referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=place_id:${id}`}
+                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_MAPS_JS_API_KEY}&q=place_id:${id}`}
                     ></iframe>
                 </div>
             </div>

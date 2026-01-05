@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
-// [MODIFIED] Prioritizing NEXT_PUBLIC_FIREBASE_PROJECT_ID for local dev consistency
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
+// [MODIFIED] Use Server-Side Env Vars only
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID;
 // Gemini 3 requires global location
 const LOCATION = 'global';
 const MODEL_ID = 'gemini-3-pro-preview';
@@ -66,6 +66,11 @@ export async function generateOldShopScore(shop: {
     return { score: 0, reasoning: "AI configuration missing", short_summary: "AI未接続", is_shinise: false, founding_year: "不明", tabelog_rating: 0 };
   }
 
+  // Optimize Reviews (Max 5 items, 300 chars each)
+  const optimizedReviews = (shop.reviews || [])
+    .slice(0, 5)
+    .map(r => r.length > 300 ? r.substring(0, 300) + "..." : r);
+
   const prompt = `
     あなたは「老舗鑑定の達人」です。
     以下の店舗情報と口コミをもとに、この店がどれくらい「老舗（Shinise）」としての価値があるかを定性的に評価し、JSON形式で回答してください。
@@ -82,7 +87,7 @@ export async function generateOldShopScore(shop: {
     店名: ${shop.name}
     住所: ${shop.address || '不明'}
     ジャンル: ${shop.types?.join(', ') || '不明'}
-    口コミ要約: ${shop.reviews?.join('\n') || 'なし'}
+    口コミ要約: ${optimizedReviews.join('\n') || 'なし'}
 
     【出力JSONフォーマット】
     {
@@ -172,7 +177,7 @@ export async function generateShopGuide(shop: {
     店名: ${shop.name}
     住所: ${shop.address || '不明'}
     ジャンル: ${shop.types?.join(', ') || '不明'}
-    口コミ要約: ${shop.reviews?.join('\n') || 'なし'}
+    口コミ要約: ${(shop.reviews || []).slice(0, 5).join('\n') || 'なし'}
 
     【記述のトーン】
     - **「〜じゃ」「〜だぞ」といった過度なキャラ作りは不要です**。

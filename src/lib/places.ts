@@ -130,10 +130,12 @@ export async function getPlaceDetails(placeId: string): Promise<any> {
   ].join(",");
 
   try {
-    const response = await fetch(`${url}?fields=${fields}&key=${API_KEY}&languageCode=ja`, {
+    const response = await fetch(`${url}?languageCode=ja`, {
       method: "GET", 
       headers: {
         "Content-Type": "application/json",
+        "X-Goog-Api-Key": API_KEY || "",
+        "X-Goog-FieldMask": fields,
       },
     });
 

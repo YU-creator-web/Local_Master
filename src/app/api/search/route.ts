@@ -32,11 +32,7 @@ export async function GET(request: NextRequest) {
 
   if ((!targetLat || !targetLng) && station) {
     try {
-      // Note: We should move this key usage to a server-side env var if not already. 
-      // It uses process.env.GOOGLE_MAPS_API_KEY which is correct.
       const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(station)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
-      // Log removed for security (Key leak prevention)
-      // console.log(`[DEBUG] Geocoding...`);
       const geoRes = await fetch(geoUrl);
       const geoData = await geoRes.json();
       
@@ -61,18 +57,17 @@ export async function GET(request: NextRequest) {
       const cleanStation = station?.trim() || "current_loc";
       const cleanGenre = genre?.trim() || "all";
       const forceRefresh = searchParams.get("force") === "true";
-      const cacheKey = `${cleanStation}_${cleanGenre}`;
+      const cacheKey = `${cleanStation}_${cleanGenre}_v2`; // v2 for new logic
       
       const { adminDb } = await import("@/lib/firebase/admin"); 
       
       let cachedShops: any[] | null = null;
       if (!forceRefresh) {
           try {
+             // ... existing cache check logic ...
              const docSnap = await adminDb.collection('searches').doc(cacheKey).get();
              if (docSnap.exists) {
                const data = docSnap.data();
-               
-               // TTL Check (90 days)
                const cachedAt = new Date(data?.cachedAt || 0).getTime();
                const now = Date.now();
                const threeMonthsMs = 90 * 24 * 60 * 60 * 1000;
@@ -92,104 +87,88 @@ export async function GET(request: NextRequest) {
 
       if (cachedShops) {
           console.log(`[Cache Hit] Returning cached results for: ${cacheKey}`);
-          // Should we sort? Let's assume cache is sorted or client sorts.
-          // Client sort logic: (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0)
           return NextResponse.json({ shops: cachedShops, status: "Cache Hit" });
       }
 
       console.log(`[Cache Miss] Starting fresh search for: ${cacheKey}`);
       
-      let places: any[] = [];
-      let isAiSourced = false;
+      const shopsToCache: any[] = [];
 
-      // 1. Discovery (AI or Legacy)
+      // 1. Discovery (AI First)
       if (station) {
-          console.log(`🤖 Starting AI Candidate Search for ${station}...`);
+          console.log(`🤖 Starting AI Candidate Search (Tabelog Top 10) for ${station}...`);
           
+          // Get Candidates with scores directly from AI
           const candidates = await findShiniseCandidates(station, genre || undefined);
           
           if (candidates.length > 0) {
-              isAiSourced = true;
-              const hydratePromises = candidates.map(async (name) => {
-                  const results = await searchByText(name, targetLat, targetLng, 2000);
-                  return results.length > 0 ? results[0] : null;
+              // 2. Hydrate with Places API (Basic info only)
+              const hydratePromises = candidates.map(async (candidate) => {
+                  try {
+                    // Search by name to get coordinates and photos
+                    // Use a slightly larger radius to ensure we find the specific shop
+                    const results = await searchByText(candidate.name, targetLat, targetLng, 2000);
+                    
+                    if (results.length > 0) {
+                        const place = results[0];
+                        // Calculate score: Tabelog * 30
+                        const shiniseScore = Math.min(Math.round(candidate.tabelog_rating * 30), 100);
+
+                        return {
+                            ...place,
+                            aiAnalysis: {
+                                score: shiniseScore,
+                                reasoning: candidate.reasoning, // Use AI reasoning from list generation
+                                short_summary: `食べログ: ${candidate.tabelog_rating}`,
+                                is_shinise: true, // Assumed by filter
+                                founding_year: candidate.founding_year || "不明", // Use AI fetched year
+                                tabelog_rating: candidate.tabelog_rating,
+                                tabelog_name: candidate.name // Pass the name found by AI (likely pure Tabelog name)
+                            }
+                        };
+                    }
+                    return null;
+                  } catch (e) {
+                      console.error(`Hydration failed for ${candidate.name}:`, e);
+                      return null;
+                  }
               });
+
               const hydrated = await Promise.all(hydratePromises);
-              places = hydrated.filter((p) => p !== null);
+              const validShops = hydrated.filter((p) => p !== null);
+              shopsToCache.push(...validShops);
           }
       }
 
-      // Fallback
-      if (places.length === 0) {
-          if (genre) {
-              places = await searchByText(genre, targetLat, targetLng, baseRadius);
-          } else {
-              places = await searchNearby(targetLat, targetLng, baseRadius);
-          }
-      }
-
-      if (places.length === 0) {
-          return NextResponse.json({ shops: [], message: "店舗が見つかりませんでした。" });
-      }
-
-      // 2. Scoring
-      const processLimit = isAiSourced ? 10 : 5;
-      const targetPlaces = places.slice(0, processLimit); 
-      const restPlaces = places.slice(processLimit); 
-      
-      const shopsToCache: any[] = [];
-
-      const scoringPromises = targetPlaces.map(async (place) => {
-          try {
-              // Get Details
-              const details = await getPlaceDetails(place.id);
-              let aiScore: OldShopScoreResult;
-
-              if (details) {
-                  const reviews = details.reviews?.map((r: any) => r.text?.text).filter(Boolean) || [];
-                  // Limit review length/count here is handled in vertex.ts theoretically, but let's trust the current flow for now.
-                  // User asked to update getPlaceDetails/reviews later.
-                  aiScore = await generateOldShopScore({
-                      name: place.displayName.text,
-                      address: place.formattedAddress,
-                      types: place.types,
-                      reviews: reviews
-                  });
-              } else {
-                  aiScore = { score: 0, reasoning: "詳細取得失敗", short_summary: "-", is_shinise: false, founding_year: "不明", tabelog_rating: 0 };
-              }
-
-              const resultShop = { ...place, aiAnalysis: aiScore };
-              shopsToCache.push(resultShop);
-
-          } catch (err) {
-              console.error(`Error processing shop ${place.displayName.text}:`, err);
-              const failedShop = { 
-                  ...place, 
-                  aiAnalysis: { score: 0, reasoning: "解析エラー", short_summary: "エラー", is_shinise: false, founding_year: "不明", tabelog_rating: 0 } 
-              };
-              shopsToCache.push(failedShop);
-          }
-      });
-
-      await Promise.all(scoringPromises);
-
-      restPlaces.forEach(place => {
-          const unscoredShop = {
+      // If AI fails or returns nothing (fallback to old logic / empty)
+      if (shopsToCache.length === 0) {
+          // Fallback: regular search but no scoring to save costs? 
+          // Or just return empty to encourage retrying?
+          // Let's do a basic nearby search without expensive AI scoring.
+          console.log("⚠️ AI search returned 0 candidates. Falling back to simple nearby search.");
+          const places = await searchNearby(targetLat, targetLng, baseRadius);
+          
+          // No AI scoring for fallback to save money
+           const fallbackShops = places.slice(0, 10).map(place => ({
               ...place,
-              aiAnalysis: { score: 0, reasoning: "未判定", short_summary: "-", is_shinise: false, founding_year: "-", tabelog_rating: 0 }
-          };
-          shopsToCache.push(unscoredShop);
-      });
+              aiAnalysis: {
+                  score: 0,
+                  reasoning: "AI検索で候補が見つかりませんでした",
+                  short_summary: "情報なし",
+                  is_shinise: false,
+                  founding_year: "-",
+                  tabelog_rating: 0
+              }
+          }));
+          shopsToCache.push(...fallbackShops);
+      }
 
-      // Sort before cache/return?
-      // Sorting makes logical sense.
+      // Sort by Score (Desc)
       shopsToCache.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
 
       // 3. Save to Cache
       try {
           if (shopsToCache.length > 0) {
-              // Fire and forget caching (but await safely)
               await adminDb.collection('searches').doc(cacheKey).set({
                   shops: shopsToCache,
                   count: shopsToCache.length,

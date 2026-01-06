@@ -18,6 +18,8 @@ interface Shop {
     short_summary: string;
     founding_year: string;
     tabelog_rating?: number;
+    reasoning?: string;
+    tabelog_name?: string;
   };
 }
 
@@ -164,22 +166,16 @@ function SearchResults() {
                     {/* Score Badges */}
                     <div className="absolute top-2 right-2 flex gap-2">
                         {/* Gourmet Score (New) */}
+                        {/* Gourmet Score (New - Gorgeous Style) */}
                         {shop.aiAnalysis?.tabelog_rating && shop.aiAnalysis.tabelog_rating > 0 && (
-                             <div className="bg-black/80 backdrop-blur px-3 py-1 rounded-full border border-orange-500/50 shadow-lg">
-                                <span className="text-[10px] font-bold block text-center text-orange-500">グルメ度</span>
-                                <span className="text-xl font-bold text-white">
-                                    {(shop.aiAnalysis.tabelog_rating * 30).toFixed(0)}
+                             <div className="bg-gradient-to-br from-black/90 via-[#1a0f0a] to-[#3a2f0a] backdrop-blur px-3 py-2 rounded-lg border border-[#D4AF37] shadow-[0_4px_10px_rgba(212,175,55,0.3)] min-w-[60px] flex flex-col items-center justify-center">
+                                <span className="text-[9px] font-bold block text-center text-[#D4AF37] tracking-wider mb-0.5 whitespace-nowrap">グルメ度</span>
+                                <span className="text-xl font-bold text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] tabular-nums tracking-tighter w-full text-center">
+                                    {(Number(shop.aiAnalysis.tabelog_rating) * 30).toFixed(0)}
                                 </span>
                             </div>
                         )}
-
-                        {/* Shinise Score */}
-                        <div className="bg-black/80 backdrop-blur px-3 py-1 rounded-full border border-[#D4AF37]/50 shadow-lg">
-                            <span className="text-[10px] font-bold block text-center text-[#D4AF37]">老舗度</span>
-                            <span className="text-xl font-bold text-white">
-                                {shop.aiAnalysis?.score ? shop.aiAnalysis.score : '-'}
-                            </span>
-                        </div>
+                        {/* Shinise Score Removed */}
                     </div>
                 </div>
                 
@@ -188,21 +184,32 @@ function SearchResults() {
                         {shop.displayName.text}
                     </h3>
                     {/* Founding Year */}
-                    {shop.aiAnalysis?.founding_year && (
-                        <p className="text-xs text-[#D4AF37] mb-2 font-semibold">
-                            🏛️ 創業：{shop.aiAnalysis.founding_year}
+                    {shop.aiAnalysis?.founding_year && shop.aiAnalysis.founding_year !== '不明' && (
+                        <p className="text-xs text-[#D4AF37] mb-2 font-semibold flex items-center animate-pulse">
+                           <span className="mr-1">🏛️</span> 創業：{shop.aiAnalysis.founding_year}
                         </p>
                     )}
                     <p className="text-xs text-gray-400 mb-4">{shop.formattedAddress}</p>
                     
-                    {shop.aiAnalysis?.short_summary && shop.aiAnalysis.short_summary !== '-' && (
-                        <div className="relative p-3 bg-[#D4AF37]/10 rounded-lg border border-[#D4AF37]/20">
-                            <span className="absolute -top-2 left-2 px-1 bg-[#1a0f0a] text-[10px] text-[#D4AF37] border border-[#D4AF37]/30 rounded">AI 解説</span>
-                            <p className="text-xs italic text-gray-300 leading-relaxed">
-                                "{shop.aiAnalysis.short_summary}"
-                            </p>
-                        </div>
-                    )}
+                    {/* Simplified Tabelog Button / Reasoning */}
+                    <div className="flex flex-col gap-2">
+                        {shop.aiAnalysis?.reasoning && (
+                             <p className="text-xs text-gray-400 line-clamp-2 min-h-[2.5em]">
+                                {shop.aiAnalysis.reasoning}
+                             </p>
+                        )}
+                        
+                        <a 
+                            href={`https://tabelog.com/rstLst/?vs=1&sw=${encodeURIComponent(shop.aiAnalysis?.tabelog_name || shop.displayName.text)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-center w-full py-2 bg-[#D4AF37]/20 hover:bg-[#D4AF37]/40 text-[#D4AF37] text-xs font-bold rounded border border-[#D4AF37]/50 transition-colors flex items-center justify-center gap-1 z-10 relative"
+                            onClick={(e) => e.stopPropagation()} // Prevent card click
+                        >
+                            <span>食べログで見る</span>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        </a>
+                    </div>
                 </div>
             </Card>
             ))}

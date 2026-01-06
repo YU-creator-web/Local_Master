@@ -169,7 +169,6 @@ export async function generateShopGuide(shop: {
     【重要: 以下の情報を必ず検索して含めてください】
     1. **食べログのURL**: 
        - 「${shop.name} ${shop.address?.split(' ')[1] || ''} 食べログ」で検索し、**店名と住所が一致する確実なURL**のみを取得してください。
-       - 確信が持てない、または公式ページが見つからない場合は、無理にURLを作らず空文字 "" を返してください。
        - 別の支店や同名の他店と間違えないよう注意してください。
     2. **喫煙・禁煙情報**: 「全面喫煙可」「分煙」「完全禁煙」など。不明な場合は「不明」。
 
@@ -180,7 +179,6 @@ export async function generateShopGuide(shop: {
     口コミ要約: ${(shop.reviews || []).slice(0, 5).join('\n') || 'なし'}
 
     【記述のトーン】
-    - **「〜じゃ」「〜だぞ」といった過度なキャラ作りは不要です**。
     - 丁寧語（〜です、〜ます）を基本とし、少し落ち着いた、教養あるガイドのような口調で記述してください。
     - 読者が「行ってみたい」と思えるような、情緒的かつ具体的な表現を心がけてください。
 
@@ -236,7 +234,14 @@ export async function generateShopGuide(shop: {
   }
 }
 
-export async function findShiniseCandidates(stationName: string, genre?: string): Promise<string[]> {
+export type CandidateResult = {
+  name: string;
+  tabelog_rating: number;
+  reasoning: string;
+  founding_year: string;
+};
+
+export async function findShiniseCandidates(stationName: string, genre?: string): Promise<CandidateResult[]> {
   const ai = getClient();
   if (!ai) {
     return [];
@@ -245,24 +250,32 @@ export async function findShiniseCandidates(stationName: string, genre?: string)
   const queryGenre = genre || "飲食店、総菜屋、甘味処、和菓子屋";
   
   const prompt = `
-    あなたの任務は、指定されたエリア（${stationName}周辺）にある「地元で愛される名店（老舗）」を10軒探し出し、その店名のリストを作成することです。
-    ※ 本日は ${new Date().toLocaleDateString('ja-JP')} です。最新の情報を使用し、閉店した店は除外してください。
+    あなたの任務は、指定されたエリア（${stationName}駅周辺）にある**「食べログの点数が高い人気店」**をトップ10抽出し、リストを作成することです。
+    ※ 本日は ${new Date().toLocaleDateString('ja-JP')} です。WEB検索を活用し、最新の食べログランキングや評価を参照してください。
 
     【検索条件】
     - エリア: ${stationName}駅 周辺
     - カテゴリ: ${queryGenre}
     - 必須条件:
-        1. **創業5年以上**（できれば10年以上が望ましい）
-        2. **地域密着型**（地元の人に愛されている）
-        3. **チェーン店は絶対に除外**してください（大手資本が入っていない個店を優先）。
+        1. **食べログで高評価（3.1以上が望ましい）**であること。
+        2. **創業年を必ず調査**すること（老舗でなくても構いませんが、歴史がある店を優先）。
+        3. **チェーン店は除外**（個店を優先）。
     
-    【重要: WEB検索を活用】
-    - 必ずWEB検索を行い、現在も営業している店を選んでください。
-    - 食べログ等の評価も参照してください。
+    【重要: WEB検索で数値を確認】
+    - 各店舗の「食べログ点数」と「創業年」を検索して正確に取得してください。
+    - 食べログ点数が見つからない場合は 3.0、創業年が見つからない場合は「不明」としてください。
 
     【出力形式: JSON】
     {
-      "candidates": [ "店名A", "店名B", ... ]
+      "candidates": [
+        {
+          "name": "店名",
+          "tabelog_rating": 3.58, // 数値で記述
+          "reasoning": "なぜ選出したか、その店の魅力を30文字程度で（例：創業50年の秘伝のタレが人気）",
+          "founding_year": "1978年" // 創業年を記載
+        },
+        ...
+      ]
     }
   `;
 
@@ -291,7 +304,7 @@ export async function findShiniseCandidates(stationName: string, genre?: string)
     
     // Fix: Apply cleanJson before parsing
     const cleanText = cleanJson(text);
-    const parsed = JSON.parse(cleanText) as { candidates: string[] };
+    const parsed = JSON.parse(cleanText) as { candidates: CandidateResult[] };
     return parsed.candidates || [];
 
   } catch (error: any) {

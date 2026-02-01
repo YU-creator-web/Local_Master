@@ -2,7 +2,7 @@ import React from 'react';
 
 // --- Button ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost'; // Added ghost
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -11,7 +11,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const variants = {
       primary: "bg-[var(--color-shinise-brown)] text-[var(--color-shinise-paper)] hover:bg-opacity-90 shadow-md",
       secondary: "bg-[var(--color-shinise-orange)] text-white hover:bg-opacity-90 shadow-md",
-      outline: "border-2 border-[var(--color-shinise-brown)] text-[var(--color-shinise-brown)] hover:bg-[var(--color-shinise-brown)] hover:text-[var(--color-shinise-paper)]"
+      outline: "border-2 border-[var(--color-shinise-brown)] text-[var(--color-shinise-brown)] hover:bg-[var(--color-shinise-brown)] hover:text-[var(--color-shinise-paper)]",
+      ghost: "bg-transparent text-white hover:bg-white/10" // Added ghost style
     };
 
     return (

@@ -111,8 +111,8 @@ export async function GET(request: NextRequest) {
                     
                     if (results.length > 0) {
                         const place = results[0];
-                        // Calculate score: Tabelog * 30
-                        const shiniseScore = Math.min(Math.round(candidate.tabelog_rating * 30), 100);
+                        // Calculate score: Tabelog * 30 (No cap to ensure correct sorting for high rated shops)
+                        const shiniseScore = Math.round(candidate.tabelog_rating * 30);
 
                         return {
                             ...place,

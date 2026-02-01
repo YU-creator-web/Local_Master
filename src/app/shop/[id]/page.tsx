@@ -91,10 +91,17 @@ function ShopDetail() {
         <div className="absolute top-0 left-0 w-full p-6 z-20 flex justify-between items-start">
              <Button 
                 variant="outline" 
-                onClick={() => router.back()} 
-                className="text-xs border-white/20 bg-black/20 backdrop-blur-md text-white hover:bg-white/20"
+                onClick={() => {
+                   const lastSearch = localStorage.getItem('lastSearchUrl');
+                   if (lastSearch) {
+                      router.push(lastSearch);
+                   } else {
+                      router.back();
+                   }
+                }} 
+                className="text-xs border-white/40 bg-black/40 backdrop-blur-md text-white hover:bg-white/20 hover:border-white z-50"
             >
-                ← 戻る
+                ← 検索結果に戻る
             </Button>
         </div>
 
@@ -220,7 +227,7 @@ function ShopDetail() {
                         style={{ border: 0, position: 'absolute', top: 0, left: 0 }}
                         allowFullScreen
                         referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_MAPS_JS_API_KEY}&q=place_id:${id}`}
+                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_MAPS_JS_API_KEY}&q=place_id:${id}&language=ja&region=JP`}
                     ></iframe>
                 </div>
             </div>

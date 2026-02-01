@@ -16,6 +16,11 @@ service cloud.firestore {
       // 書き込み: UIDが一致すること
       allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
+
+    // 🍶 飲み歩きコース
+    match /users/{userId}/course/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
     
     // 🔍 その他（検索結果など）はAPI経由なのでAPI以外アクセス禁止
     match /{document=**} {

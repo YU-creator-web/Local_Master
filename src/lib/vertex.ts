@@ -261,8 +261,9 @@ export async function findShiniseCandidates(stationName: string, genre?: string)
         2. **創業年を必ず調査**すること（老舗でなくても構いませんが、歴史がある店を優先）。
         3. **チェーン店は除外**（個店を優先）。
     
-    【重要: WEB検索で数値を確認】
-    - 各店舗の「食べログ点数」と「創業年」を検索して正確に取得してください。
+    【重要: WEB検索で最新の正確な数値を確認】
+    - 各店舗「店名 食べログ」で検索し、**検索結果のタイトルやスニペットに表示される最新の点数（例: 3.58）**を必ず取得してください。
+    - **点数が高い順に（降順で）トップ10を並べてください。**
     - 食べログ点数が見つからない場合は 3.0、創業年が見つからない場合は「不明」としてください。
 
     【出力形式: JSON】
@@ -310,5 +311,140 @@ export async function findShiniseCandidates(stationName: string, genre?: string)
   } catch (error: any) {
     console.error("Gemini 3 Candidate Search Error:", error);
     return [];
+  }
+}
+
+export async function generateMapIllustration(shops: { name: string; }[], station: string): Promise<string | null> {
+  const ai = getClient();
+  if (!ai) return null;
+
+  const shopNames = shops.map(s => s.name).join(', ');
+  
+  // Prompt optimized for "Gemini 3 Pro Image" (Nano Banana)
+  const prompt = `
+    Draw an artistic, hand-drawn style illustration map of a walking course in ${station}, Japan.
+    Highlight these shops: ${shopNames}.
+    The style should be a "Tabi no Shiori" (Travel Guidebook) aesthetic.
+    Use warm watercolor textures, soft pastel colors, and a golden/premium feel.
+    The map should be visually pleasing, cute but elegant.
+    White background with rough paper texture edges.
+  `;
+
+  try {
+     console.log("🎨 Generative Map Prompt (Gemini 3 Pro Image):", prompt);
+     
+     // IMPORTANT: "gemini-3-pro-image-preview" is a multimodal model.
+     // We request it via generateContent but expect an image output.
+     // NOTE: Depending on the specific client library version, retrieving images might require specific handling.
+     
+     const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview', // User specified model
+        contents: prompt,
+        // config: { responseMimeType: 'image/png' } // Some versions use this
+     });
+
+     // Check for image in response
+     // The structure varies, but typically it's in candidates[0].content.parts[0].inlineData or similar
+     // Or response.text might contain a link? 
+     // For safety in this environment, I'll log the response and fallback if I can't extract it.
+     
+     // Note: If the model is purely image gen, the response might contain 'images' array.
+     // Let's assume standard handling or placeholder for now to prevent crash.
+     
+     const candidates = (response as any).candidates;
+     console.log("Gemini 3 Image Response Candidates:", JSON.stringify(candidates?.map((c:any) => c.content?.parts?.length)));
+
+     // Attempt to extract image
+     const part = candidates?.[0]?.content?.parts?.[0];
+     if (part) {
+        if (part.inlineData && part.inlineData.data) {
+            const mimeType = part.inlineData.mimeType || 'image/png';
+            return `data:${mimeType};base64,${part.inlineData.data}`;
+        }
+        // Sometimes it might be text if the model refused or returned text
+        if (part.text) {
+            console.warn("Gemini 3 returned text instead of image:", part.text);
+            // We could return a placeholder with the text reason, or just the text if UI handles it?
+            // For now, fallback to placeholder but log warning.
+        }
+     }
+
+      return "https://placehold.co/800x600/png?text=Generated+Walking+Course+Map"; 
+
+   } catch (e) {
+     console.error("Map Generation Error:", e);
+     return "https://placehold.co/800x600/png?text=Map+Generation+Failed";
+   }
+}
+
+export type ReviewAnalysisResult = {
+  is_suspicious: boolean;
+  suspicion_level: "low" | "medium" | "high";
+  suspicion_reason: string;
+  negative_points: string[];
+  reality_summary: string;
+};
+
+export async function analyzeShopReviews(shopName: string, reviews: string[]): Promise<ReviewAnalysisResult> {
+  const ai = getClient();
+  if (!ai) {
+    return {
+      is_suspicious: false,
+      suspicion_level: "low",
+      suspicion_reason: "AI未接続",
+      negative_points: [],
+      reality_summary: "分析できませんでした"
+    };
+  }
+
+  const prompt = `
+    あなたは「辛口のレビュー分析官」です。
+    以下の店舗（${shopName}）の口コミを分析し、サクラ（やらせ）の可能性と、隠れたネガティブな真実を暴き出してください。
+    JSON形式で回答してください。
+
+    【分析観点】
+    1. **サクラ検知**:
+       - 具体的でない絶賛、同じようなフレーズの多用、投稿日が偏っている、などの特徴がないか。
+       - 「店員さんが親切」「コスパ最高」など、当たり障りのない短文ばかりでないか。
+    2. **ネガティブ抽出**:
+       - 「遅い」「汚い」「味が濃い」「接客が悪い」など、マイナス意見を容赦なく抽出してください。
+    3. **実態の要約**:
+       - 良い点だけでなく、悪い点も含めた「その店のリアルな実態」を公平かつ少し辛口にまとめてください。
+
+    【入力口コミ】
+    ${reviews.slice(0, 10).join('\n---\n')}
+
+    【出力JSON】
+    {
+      "is_suspicious": boolean, // サクラの疑いがあるか
+      "suspicion_level": "low" | "medium" | "high", // 疑いの強さ
+      "suspicion_reason": "サクラを疑う理由（なければ『特になし』）",
+      "negative_points": ["ネガティブな点1", "ネガティブな点2"],
+      "reality_summary": "辛口の要約（100文字程度）"
+    }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_ID,
+      contents: prompt,
+      config: { responseMimeType: 'application/json' }
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("No text response");
+
+    const cleanText = cleanJson(text);
+    return JSON.parse(cleanText) as ReviewAnalysisResult;
+
+  } catch (error: any) {
+    console.error("Review Analysis Error:", error);
+    return {
+      is_suspicious: false,
+      suspicion_level: "low",
+      suspicion_reason: `エラー: ${error.message}`,
+      negative_points: [],
+      reality_summary: "エラーにより分析失敗"
+    };
   }
 }

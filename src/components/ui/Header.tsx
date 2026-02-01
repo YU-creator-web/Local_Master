@@ -18,6 +18,13 @@ export const Header = () => {
       </h1>
       
       <div className="flex items-center gap-4">
+        <Button 
+           variant="ghost" 
+           onClick={() => router.push('/course')}
+           className="text-xs md:text-sm text-white/80 hover:text-[#D4AF37]"
+        >
+           飲み歩きコース🍶
+        </Button>
         {user ? (
           <div className="flex items-center gap-3">
              {/* eslint-disable-next-line @next/next/no-img-element */}

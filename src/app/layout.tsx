@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 };
 
 import { Providers } from "./providers";
+import { CourseProvider } from "@/context/CourseContext";
 
 export default function RootLayout({
   children,
@@ -28,9 +29,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" suppressHydrationWarning>
-      <body className={`${shipporiMincho.variable} ${notoSansJP.variable} antialiased`}>
+      <body className={`${shipporiMincho.variable} ${notoSansJP.variable} antialiased`} suppressHydrationWarning>
         <Providers>
-          {children}
+          <CourseProvider>
+            {children}
+          </CourseProvider>
         </Providers>
       </body>
     </html>

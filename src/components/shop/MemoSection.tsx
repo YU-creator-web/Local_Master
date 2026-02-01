@@ -60,60 +60,54 @@ export default function MemoSection({ placeId }: { placeId: string }) {
   };
 
   if (!user) {
-    return (
-      <div className="mt-8 p-6 rounded-xl bg-[#1a0f0a]/40 border border-[#D4AF37]/20 backdrop-blur-sm text-center">
-        <h3 className="text-lg font-serif text-[#D4AF37] mb-2">
-           旅の思い出を記録しませんか？
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">
-          ログインすると、このお店についての自分だけのメモを残せます。<br/>
-          (誰にも公開されません 🤫)
+      <div className="mt-4 p-4 rounded-lg bg-black/40 border border-[#D4AF37]/20 text-center">
+        <p className="text-xs text-gray-400 mb-3">
+          ログインするとメモを残せます
         </p>
         <button
           onClick={signInWithGoogle}
-          className="px-6 py-2 bg-[#D4AF37] text-[#1a0f0a] font-bold rounded-full hover:bg-[#FDB931] transition-colors shadow-lg"
+          className="px-4 py-1.5 bg-[#D4AF37] text-black text-xs font-bold rounded-full hover:bg-[#FDB931]"
         >
-          Googleでログインしてメモを書く
+          Googleでログイン
         </button>
       </div>
-    );
   }
 
   return (
-    <div className="mt-8 p-6 rounded-xl bg-[#1a0f0a]/60 border border-[#D4AF37]/30 backdrop-blur-sm">
-      <div className="flex justify-between items-end mb-3">
-        <h3 className="text-xl font-serif text-[#D4AF37] drop-shadow-md">
-           📝 旅のメモ
+    <div className="mt-4 p-4 rounded-lg bg-black/40 border border-[#D4AF37]/30">
+      <div className="flex justify-between items-end mb-2">
+        <h3 className="text-sm font-bold text-[#D4AF37] flex items-center gap-2">
+           <span>📝</span> メモ (非公開)
         </h3>
         {lastSaved && (
-           <span className="text-xs text-gray-500">
-             最終保存: {lastSaved.toLocaleTimeString()}
+           <span className="text-[10px] text-gray-500">
+             {lastSaved.toLocaleTimeString()}
            </span>
         )}
       </div>
 
       {isLoading ? (
-        <div className="h-24 animate-pulse bg-gray-800/50 rounded-lg"></div>
+        <div className="h-20 animate-pulse bg-gray-800/50 rounded-lg"></div>
       ) : (
         <textarea
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
-          placeholder="味の感想、頼んだメニュー、店主との会話などを記録しよう..."
-          className="w-full h-32 bg-black/40 border border-[#D4AF37]/20 rounded-lg p-4 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all resize-none"
+          placeholder="メモを入力..."
+          className="w-full h-24 bg-black/60 border border-[#D4AF37]/20 rounded p-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] resize-none"
         />
       )}
 
-      <div className="flex justify-end mt-3">
+      <div className="flex justify-end mt-2">
         <button
           onClick={handleSave}
           disabled={isSaving || isLoading}
-          className={`px-6 py-2 rounded-lg font-bold transition-all shadow-md flex items-center gap-2
+          className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1
             ${isSaving 
-              ? 'bg-[#D4AF37]/50 text-[#1a0f0a]/50 cursor-wait' 
-              : 'bg-[#D4AF37] text-[#1a0f0a] hover:bg-[#FDB931] hover:scale-105 active:scale-95'
+              ? 'bg-[#D4AF37]/50 text-black/50' 
+              : 'bg-[#D4AF37] text-black hover:bg-[#FDB931]'
             }`}
         >
-          {isSaving ? '保存中...' : '保存する'}
+          {isSaving ? '保存中...' : '保存'}
         </button>
       </div>
     </div>

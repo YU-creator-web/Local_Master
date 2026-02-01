@@ -29,6 +29,16 @@ function SearchResults() {
     setError('');
     setShops([]);
 
+    // Check Session Storage first
+    const cacheKey = `search_cache_${url}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+       console.log("Using client-side cache");
+       setShops(JSON.parse(cached));
+       setLoading(false);
+       return;
+    }
+
     try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -40,6 +50,12 @@ function SearchResults() {
         
         if (data.shops) {
             setShops(data.shops);
+            // Save to Session Storage
+            try {
+               sessionStorage.setItem(cacheKey, JSON.stringify(data.shops));
+            } catch (e) {
+               console.warn("Failed to save to sessionStorage", e);
+            }
         } else {
              setShops([]);
         }

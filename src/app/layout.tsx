@@ -15,8 +15,8 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "老舗Master",
-  description: "AIが語る、老舗の物語。",
+  title: "路地裏の名店 - Local Hidden Gems",
+  description: "街の喧騒を離れ、地元に愛される物語に出会う旅へ。",
 };
 
 import { Providers } from "./providers";

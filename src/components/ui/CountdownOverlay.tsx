@@ -56,7 +56,7 @@ export function CountdownOverlay({ onComplete, isLoading }: CountdownOverlayProp
 
       <div className="relative z-10 flex flex-col items-center">
         <h2 className="text-[#D4AF37] font-[family-name:var(--font-mincho)] text-2xl mb-8 tracking-[0.5em] animate-pulse">
-            老舗の歴史を紐解いています
+            街の呼吸に、耳を澄ませて...
         </h2>
 
         {/* Timer Circle */}
@@ -75,8 +75,8 @@ export function CountdownOverlay({ onComplete, isLoading }: CountdownOverlayProp
         </div>
 
         <p className="mt-12 text-white/60 text-sm font-[family-name:var(--font-mincho)] tracking-widest text-center leading-loose">
-            百年の刻を超える物語。<br/>
-            少々お時間を頂戴いたします。
+            喧騒の奥にある、本物の日常を探し出します。<br/>
+            少々お時間を。
         </p>
       </div>
     </div>

@@ -50,19 +50,43 @@ export function CourseProvider({ children }: { children: ReactNode }) {
              
              if (docSnap.exists()) {
                 const data = docSnap.data();
-                if (data.items) {
-                   setCourseItems(data.items);
+                const cloudItems = data.items || [];
+                
+                // Merge strategies:
+                // We want to preserve local items (added before login) and combine with cloud items.
+                // Use a Map to deduplicate by ID.
+                const local = localStorage.getItem('shinise_course_items');
+                let localItems: Shop[] = [];
+                if (local) {
+                   try {
+                     localItems = JSON.parse(local);
+                   } catch (e) { console.error("Parse error", e); }
+                }
+
+                if (localItems.length > 0) {
+                    // Merge local into cloud
+                    const mergedMap = new Map();
+                    cloudItems.forEach((item: Shop) => mergedMap.set(item.id, item));
+                    localItems.forEach((item: Shop) => mergedMap.set(item.id, item));
+                    
+                    const mergedItems = Array.from(mergedMap.values()) as Shop[];
+                    setCourseItems(mergedItems);
+                    
+                    // Update cloud if changed
+                    if (mergedItems.length > cloudItems.length) {
+                         await setDoc(docRef, { items: mergedItems }, { merge: true });
+                    }
+                } else {
+                    setCourseItems(cloudItems);
                 }
              } else {
-                // If no cloud data, maybe we should sync local to cloud?
-                // For now, let's keep it simple: if empty cloud, start empty (or keep current state if we want to migrate)
-                // Migration strategy: If local has items and cloud is empty, save local to cloud.
+                // No cloud data, migrate all local data
                 const local = localStorage.getItem('shinise_course_items');
                 if (local) {
                    const localItems = JSON.parse(local);
                    if (localItems.length > 0) {
                       setCourseItems(localItems);
-                      // Sync to cloud immediately
+                      // Sync to cloud
                       await setDoc(docRef, { items: localItems });
                    }
                 }

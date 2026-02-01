@@ -80,73 +80,105 @@ export default function Home() {
         </ThreeCanvas>
       </div>
 
-      {/* Hero Content */}
-      <main className="relative z-10 w-full max-w-lg px-6 flex flex-col items-center gap-10">
+      {/* Hero Content - Split Layout for Desktop */}
+      <main className="relative z-10 w-full max-w-7xl px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-12 md:gap-0 min-h-screen md:h-screen py-20 md:py-0">
         
-        {/* Title Section */}
-        <div className="flex flex-col items-center text-center drop-shadow-md">
-            <h1 className="text-5xl md:text-7xl font-bold tracking-[0.2em] font-[family-name:var(--font-mincho)] text-white drop-shadow-lg">
-            老舗
-            </h1>
-            <p className="mt-4 text-xs md:text-sm tracking-[0.5em] uppercase opacity-90 text-[#F0E68C] font-bold font-[family-name:var(--font-sans)]">
-                Shinise Master
-            </p>
-        </div>
+        {/* Left Side: Title & Narrative */}
+        <div className="flex flex-col items-center md:items-start space-y-8 md:w-1/2">
+            <div className="flex flex-row items-start gap-6">
+                <div className="hidden md:block h-32 w-[1px] bg-gradient-to-b from-white/0 via-[#D4AF37] to-white/0"></div>
+                
+                <div className="space-y-6">
+                    <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
+                        <span className="text-[10px] tracking-[0.3em] text-white/80 font-medium">AI AGENT × LOCAL GEMS</span>
+                    </div>
 
-        {/* Glassmorphism Card - High Contrast */}
-        <div className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-xl p-8 shadow-2xl">
-          <p className="text-center text-sm mb-6 text-white font-medium leading-loose font-[family-name:var(--font-mincho)] drop-shadow-sm">
-            百年の刻を超えて愛される店。<br/>
-            その物語を、今のあなたへ。
-          </p>
+                    <h1 className="text-5xl md:text-7xl font-medium tracking-[0.1em] font-[family-name:var(--font-mincho)] text-white leading-tight">
+                        <span className="block text-4xl md:text-5xl mb-2 opacity-90">地元に</span>
+                        <span className="block text-4xl md:text-5xl mb-2 opacity-90">愛される店を</span>
+                        <span className="block text-[#F0E68C] blur-[1px] hover:blur-none transition-all duration-700">巡る旅</span>
+                    </h1>
 
-          <form onSubmit={handleSearch} className="space-y-6">
-            <div className="space-y-5">
-                <div className="relative group">
-                    <label className="text-xs text-[#D4AF37] font-bold mb-1 block pl-2">探したい場所</label>
-                    <Input 
-                        placeholder="例: 京都、浅草" 
-                        value={station}
-                        onChange={(e) => setStation(e.target.value)}
-                        className="bg-white/90 border-transparent text-gray-900 placeholder:text-gray-500 focus:bg-white focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/50 transition-all duration-300 rounded-lg py-3 font-bold shadow-inner"
-                    />
-                </div>
-
-                <div className="relative group">
-                    <label className="text-xs text-[#D4AF37] font-bold mb-1 block pl-2">ジャンル (任意)</label>
-                    <Input 
-                        placeholder="例: 鰻、寿司" 
-                        value={genre}
-                        onChange={(e) => setGenre(e.target.value)}
-                        className="bg-white/90 border-transparent text-gray-900 placeholder:text-gray-500 focus:bg-white focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/50 transition-all duration-300 rounded-lg py-3 font-bold shadow-inner"
-                    />
+                    <p className="hidden md:block text-sm text-white/60 font-[family-name:var(--font-mincho)] leading-loose tracking-widest pl-1">
+                        路地の奥、看板の明かりが呼んでいる。<br/>
+                        AIと切り拓く、未体験のローカル。
+                    </p>
                 </div>
             </div>
-            
-            <Button 
-                type="submit" 
-                className="w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#C5A028] hover:from-[#EDCC53] hover:to-[#D4AF37] text-black font-bold tracking-widest rounded-lg transition-all duration-300 shadow-lg hover:shadow-[0_0_20px_rgba(212,175,55,0.6)] transform hover:-translate-y-0.5"
-            >
-              探求する
-            </Button>
-          </form>
+        </div>
 
-          <div className="mt-6 text-center">
-              <button 
-                onClick={handleNearbySearch}
-                disabled={loading}
-                className="text-xs font-bold text-white/90 hover:text-[#D4AF37] tracking-wider border-b border-white/30 hover:border-[#D4AF37] transition-all pb-1 flex items-center justify-center gap-2 mx-auto"
-              >
-                {loading ? (
-                    <span className="animate-pulse">現在地から探索中...</span>
-                ) : (
-                    <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        現在地から紐解く
-                    </>
-                )}
-              </button>
-          </div>
+        {/* Right Side: Interactive "Ticket" Card */}
+        <div className="w-full md:w-[450px] perspective-1000">
+            <div className="relative bg-black/60 backdrop-blur-md border-[0.5px] border-white/20 rounded-2xl p-10 shadow-2xl transform transition-all duration-500 hover:shadow-[0_0_40px_rgba(212,175,55,0.2)] group">
+                {/* Decorative Elements */}
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#D4AF37]/20 blur-[60px] rounded-full pointer-events-none opacity-50"></div>
+                
+                {/* Vertical Text Decoration */}
+                <div className="absolute right-6 top-10 hidden md:block opacity-30">
+                     <p className="writing-vertical-rl text-[10px] tracking-[0.4em] text-white font-serif border-l border-white/30 pl-2">JOURNEY STARTS HERE</p>
+                </div>
+
+                <div className="relative z-10 space-y-10">
+                    <div className="space-y-3">
+                        <h2 className="text-2xl text-white font-[family-name:var(--font-mincho)] tracking-widest flex items-center gap-4">
+                            <span className="w-12 h-[1px] bg-gradient-to-r from-transparent to-[#D4AF37]"></span>
+                            旅の支度
+                        </h2>
+                        <p className="text-[10px] text-white/50 font-light tracking-[0.2em] pl-16 uppercase">Design your night</p>
+                    </div>
+
+                    <form onSubmit={handleSearch} className="space-y-8 pl-4 pr-8">
+                        <div className="space-y-8">
+                            <div className="group relative">
+                                <label className="text-[9px] text-[#D4AF37] tracking-[0.2em] uppercase mb-1 block opacity-80 group-focus-within:opacity-100 transition-opacity">Area</label>
+                                <Input 
+                                    placeholder="エリア (例: 高円寺)" 
+                                    value={station}
+                                    onChange={(e) => setStation(e.target.value)}
+                                    className="bg-transparent border-b border-white/20 text-white placeholder:text-white/20 focus:bg-transparent focus:border-[#D4AF37] focus:ring-0 focus:outline-none transition-all duration-300 rounded-none px-0 py-2 text-base font-normal tracking-wider"
+                                />
+                            </div>
+
+                            <div className="group relative">
+                                <label className="text-[9px] text-[#D4AF37] tracking-[0.2em] uppercase mb-1 block opacity-80 group-focus-within:opacity-100 transition-opacity">Genre</label>
+                                <Input 
+                                    placeholder="ジャンル (例: やきとり)" 
+                                    value={genre}
+                                    onChange={(e) => setGenre(e.target.value)}
+                                    className="bg-transparent border-b border-white/20 text-white placeholder:text-white/20 focus:bg-transparent focus:border-[#D4AF37] focus:ring-0 focus:outline-none transition-all duration-300 rounded-none px-0 py-2 text-base font-normal tracking-wider"
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="pt-6">
+                            <Button 
+                                type="submit" 
+                                className="w-full py-4 bg-white/5 hover:bg-[#D4AF37] text-white border border-white/20 hover:border-[#D4AF37] hover:text-[#1a0f0a] font-medium tracking-[0.4em] rounded-sm transition-all duration-500 flex items-center justify-center gap-4 group/btn"
+                            >
+                                START
+                            </Button>
+                        </div>
+                    </form>
+
+                    <div className="pt-2 text-center border-t border-white/5">
+                        <button 
+                            onClick={handleNearbySearch}
+                            disabled={loading}
+                            className="w-full py-4 text-xs tracking-widest text-white/40 hover:text-white transition-colors duration-300 flex items-center justify-center gap-3"
+                        >
+                            {loading ? (
+                                <span className="animate-pulse">LOCATING...</span>
+                            ) : (
+                                <>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                    USE CURRENT LOCATION
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
       </main>
 

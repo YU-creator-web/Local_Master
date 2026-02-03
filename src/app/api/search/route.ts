@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   const baseRadius = parseInt(searchParams.get("radius") || "1000", 10);
   const station = searchParams.get("station");
   const genre = searchParams.get("genre");
+  const mode = searchParams.get("mode") === 'adventure' ? 'adventure' : 'standard';
 
   // Validate Lat/Lng
   if (isNaN(lat) || lat < -90 || lat > 90 || isNaN(lng) || lng < -180 || lng > 180) {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
       const cleanStation = station?.trim() || "current_loc";
       const cleanGenre = genre?.trim() || "all";
       const forceRefresh = searchParams.get("force") === "true";
-      const cacheKey = `${cleanStation}_${cleanGenre}_v2`; // v2 for new logic
+      const cacheKey = `${cleanStation}_${cleanGenre}_${mode}_v2`; // Include mode in cache key
       
       const { adminDb } = await import("@/lib/firebase/admin"); 
       
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
           console.log(`🤖 Starting AI Candidate Search (Tabelog Top 10) for ${station}...`);
           
           // Get Candidates with scores directly from AI
-          const candidates = await findShiniseCandidates(station, genre || undefined);
+          const candidates = await findShiniseCandidates(station, genre || undefined, mode);
           
           if (candidates.length > 0) {
               // 2. Hydrate with Places API (Basic info only)

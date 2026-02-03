@@ -10,6 +10,7 @@ export default function Home() {
   const router = useRouter();
   const [station, setStation] = useState('');
   const [genre, setGenre] = useState('');
+  const [mode, setMode] = useState<'standard' | 'adventure'>('standard');
   const [loading, setLoading] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -34,7 +35,8 @@ export default function Home() {
     if (station.trim()) {
       const query = new URLSearchParams({
         station: station.trim(),
-        ...(genre.trim() && { genre: genre.trim() })
+        ...(genre.trim() && { genre: genre.trim() }),
+        mode
       }).toString();
       router.push(`/search?${query}`);
     }
@@ -46,7 +48,7 @@ export default function Home() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          router.push(`/search?lat=${latitude}&lng=${longitude}&genre=${encodeURIComponent(genre)}`);
+          router.push(`/search?lat=${latitude}&lng=${longitude}&genre=${encodeURIComponent(genre)}&mode=${mode}`);
         },
         (error) => {
           console.error("Geolocation error:", error);
@@ -128,6 +130,28 @@ export default function Home() {
                         <p className="text-[10px] text-white/50 font-light tracking-[0.2em] pl-16 uppercase">Design your night</p>
                     </div>
 
+                    <div className="flex items-center justify-center gap-6 pb-2">
+                        <button 
+                            type="button"
+                            onClick={() => setMode('standard')}
+                            className={`relative px-2 py-1 transition-all duration-300 ${mode === 'standard' ? 'text-[#D4AF37]' : 'text-white/30 hover:text-white/60'}`}
+                        >
+                            <span className="text-xs tracking-[0.2em] font-medium">定番</span>
+                            <span className="text-[9px] block text-center opacity-60 tracking-tighter">STANDARD</span>
+                            {mode === 'standard' && <span className="absolute -bottom-1 left-0 w-full h-[1px] bg-[#D4AF37] shadow-[0_0_10px_#D4AF37]"></span>}
+                        </button>
+                        <div className="w-[1px] h-4 bg-white/10"></div>
+                        <button 
+                            type="button"
+                            onClick={() => setMode('adventure')}
+                            className={`relative px-2 py-1 transition-all duration-300 ${mode === 'adventure' ? 'text-[#D4AF37]' : 'text-white/30 hover:text-white/60'}`}
+                        >
+                            <span className="text-xs tracking-[0.2em] font-medium">冒険</span>
+                            <span className="text-[9px] block text-center opacity-60 tracking-tighter">ADVENTURE</span>
+                            {mode === 'adventure' && <span className="absolute -bottom-1 left-0 w-full h-[1px] bg-[#D4AF37] shadow-[0_0_10px_#D4AF37]"></span>}
+                        </button>
+                    </div>
+
                     <form onSubmit={handleSearch} className="space-y-8 pl-4 pr-8">
                         <div className="space-y-8">
                             <div className="group relative">
@@ -183,7 +207,7 @@ export default function Home() {
       </main>
 
       <footer className="absolute bottom-4 text-[10px] tracking-widest text-white/60 drop-shadow-md">
-        © 2026 SINISE MASTER
+        © 2026 LOCAL MASTER
       </footer>
     </div>
   );

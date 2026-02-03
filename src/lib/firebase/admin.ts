@@ -32,4 +32,5 @@ if (apps.length === 0) {
 }
 
 // Export the Admin Firestore instance
+// Export the Admin Firestore instance
 export const adminDb = getFirestore(app);

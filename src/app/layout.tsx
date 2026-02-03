@@ -15,7 +15,7 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "路地裏の名店 - Local Hidden Gems",
+  title: "Local Master - 路地裏の名店を巡る旅",
   description: "街の喧騒を離れ、地元に愛される物語に出会う旅へ。",
 };
 

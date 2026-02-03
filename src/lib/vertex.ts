@@ -241,7 +241,7 @@ export type CandidateResult = {
   founding_year: string;
 };
 
-export async function findShiniseCandidates(stationName: string, genre?: string): Promise<CandidateResult[]> {
+export async function findShiniseCandidates(stationName: string, genre?: string, mode: 'standard' | 'adventure' = 'standard'): Promise<CandidateResult[]> {
   const ai = getClient();
   if (!ai) {
     return [];
@@ -249,36 +249,74 @@ export async function findShiniseCandidates(stationName: string, genre?: string)
 
   const queryGenre = genre || "飲食店、総菜屋、甘味処、和菓子屋";
   
-  const prompt = `
-    あなたの任務は、指定されたエリア（${stationName}駅周辺）にある**「食べログの点数が高い人気店」**をトップ10抽出し、リストを作成することです。
-    ※ 本日は ${new Date().toLocaleDateString('ja-JP')} です。WEB検索を活用し、最新の食べログランキングや評価を参照してください。
+  let prompt = "";
 
-    【検索条件】
-    - エリア: ${stationName}駅 周辺
-    - カテゴリ: ${queryGenre}
-    - 必須条件:
-        1. **食べログで高評価（3.1以上が望ましい）**であること。
-        2. **創業年を必ず調査**すること（老舗でなくても構いませんが、歴史がある店を優先）。
-        3. **チェーン店は除外**（個店を優先）。
-    
-    【重要: WEB検索で最新の正確な数値を確認】
-    - 各店舗「店名 食べログ」で検索し、**検索結果のタイトルやスニペットに表示される最新の点数（例: 3.58）**を必ず取得してください。
-    - **点数が高い順に（降順で）トップ10を並べてください。**
-    - 食べログ点数が見つからない場合は 3.0、創業年が見つからない場合は「不明」としてください。
+  if (mode === 'adventure') {
+      // Adventure Mode: Hidden Gems / Locals Only
+      prompt = `
+        あなたの任務は、指定されたエリア（${stationName}駅周辺）にある**「知る人ぞ知る隠れた名店（穴場）」**をトップ10抽出し、リストを作成することです。
+        ※ 本日は ${new Date().toLocaleDateString('ja-JP')} です。WEB検索を活用し、最新の情報を参照してください。
 
-    【出力形式: JSON】
-    {
-      "candidates": [
+        【検索条件】
+        - エリア: ${stationName}駅 周辺
+        - カテゴリ: ${queryGenre}
+        - **ターゲット:**
+            - 食べログの点数が**そこまで高くなくても（3.0〜3.5程度）**、地元の人に愛されている店。
+            - 観光客があまり行かない、路地裏や目立たない場所にある店。
+            - 「入りにくいが味は本物」「常連が多い」「昭和レトロな雰囲気」などの特徴がある店。
+        - 除外: チェーン店、誰でも知っている超有名店、観光ガイドのトップに出るような店。
+        
+        【重要: WEB検索でリアルな評判を確認】
+        - 「${stationName} 穴場 グルメ」「${stationName} 地元民 おすすめ」などで検索し、ブログやSNSの声を参考にしてください。
+        - **点数が高い順である必要はありません。**「発見する喜び」がある店を優先してください。
+        - 食べログ点数が見つからない場合は 3.0、創業年が見つからない場合は「不明」としてください。
+
+        【出力形式: JSON】
         {
-          "name": "店名",
-          "tabelog_rating": 3.58, // 数値で記述
-          "reasoning": "なぜ選出したか、その店の魅力を30文字程度で（例：創業50年の秘伝のタレが人気）",
-          "founding_year": "1978年" // 創業年を記載
-        },
-        ...
-      ]
-    }
-  `;
+          "candidates": [
+            {
+              "name": "店名",
+              "tabelog_rating": 3.25, // 数値
+              "reasoning": "なぜ穴場なのか（例：路地裏の看板のない名店、常連だけで満席、等）",
+              "founding_year": "1982年"
+            },
+            ...
+          ]
+        }
+      `;
+  } else {
+      // Standard Mode: High Rating / Shinise (Original Logic)
+      prompt = `
+        あなたの任務は、指定されたエリア（${stationName}駅周辺）にある**「食べログの点数が高い人気店」**をトップ10抽出し、リストを作成することです。
+        ※ 本日は ${new Date().toLocaleDateString('ja-JP')} です。WEB検索を活用し、最新の食べログランキングや評価を参照してください。
+
+        【検索条件】
+        - エリア: ${stationName}駅 周辺
+        - カテゴリ: ${queryGenre}
+        - 必須条件:
+            1. **食べログで高評価（3.1以上が望ましい）**であること。
+            2. **創業年を必ず調査**すること（老舗でなくても構いませんが、歴史がある店を優先）。
+            3. **チェーン店は除外**（個店を優先）。
+        
+        【重要: WEB検索で最新の正確な数値を確認】
+        - 各店舗「店名 食べログ」で検索し、**検索結果のタイトルやスニペットに表示される最新の点数（例: 3.58）**を必ず取得してください。
+        - **点数が高い順に（降順で）トップ10を並べてください。**
+        - 食べログ点数が見つからない場合は 3.0、創業年が見つからない場合は「不明」としてください。
+
+        【出力形式: JSON】
+        {
+          "candidates": [
+            {
+              "name": "店名",
+              "tabelog_rating": 3.58, // 数値で記述
+              "reasoning": "なぜ選出したか、その店の魅力を30文字程度で（例：創業50年の秘伝のタレが人気）",
+              "founding_year": "1978年" // 創業年を記載
+            },
+            ...
+          ]
+        }
+      `;
+  }
 
   try {
     const response = await ai.models.generateContent({

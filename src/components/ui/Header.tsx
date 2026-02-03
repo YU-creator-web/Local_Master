@@ -14,7 +14,7 @@ export const Header = () => {
         className="text-xl font-bold font-[family-name:var(--font-mincho)] cursor-pointer text-white drop-shadow-[0_0_5px_rgba(212,175,55,0.5)] bg-clip-text text-transparent bg-gradient-to-r from-white to-[#D4AF37]" 
         onClick={() => router.push('/')}
       >
-        老舗 Master
+        ローカル Master
       </h1>
       
       <div className="flex items-center gap-4">

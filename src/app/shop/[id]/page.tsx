@@ -7,6 +7,9 @@ import { useAuth } from '@/lib/firebase/auth';
 import { ThreeCanvas } from '@/components/canvas/Scene';
 import { GoldParticles } from '@/components/canvas/Particles';
 import MemoSection from '@/components/shop/MemoSection';
+import { AgentSelector } from '@/components/agent/AgentSelector';
+import { AgentResults } from '@/components/agent/AgentResults';
+import { AgentType, AgentResponse } from '@/lib/agents/core';
 
 
 function ShopDetail() {
@@ -19,6 +22,41 @@ function ShopDetail() {
   const [aiGuide, setAiGuide] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Agent State
+  const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
+  const [agentResults, setAgentResults] = useState<AgentResponse[]>([]);
+  const [pendingAgents, setPendingAgents] = useState<AgentType[]>([]);
+
+  const handleDeployAgents = async (selected: AgentType[]) => {
+    setIsAgentSelectorOpen(false);
+    setAgentResults([]);
+    setPendingAgents(selected);
+
+    // Fire requests concurrently but handle results individually as they finish
+    selected.forEach(async (type) => {
+        try {
+            const res = await fetch('/api/agent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    agentType: type,
+                    shopName: shop.displayName.text,
+                    shopAddress: shop.formattedAddress
+                })
+            });
+            const data: AgentResponse = await res.json();
+            
+            // Update state safely
+            setAgentResults(prev => [...prev, data]);
+            setPendingAgents(prev => prev.filter(p => p !== type));
+            
+        } catch (e) {
+            console.error(`Agent ${type} failed`, e);
+            setPendingAgents(prev => prev.filter(p => p !== type));
+        }
+    });
+  };
   
 
 
@@ -137,12 +175,26 @@ function ShopDetail() {
                 >
                     Google Maps
                 </a>
+                
+                {/* Agent Mission Control Button */}
+                <Button
+                    onClick={() => setIsAgentSelectorOpen(true)}
+                    className="bg-black/60 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37] font-bold py-3 px-6 rounded-lg shadow-[0_0_15px_rgba(212,175,55,0.2)] hover:shadow-[0_0_25px_rgba(212,175,55,0.5)] transition-all flex items-center animate-pulse hover:animate-none"
+                >
+                    <span className="mr-2 text-xl">🕵️‍♀️</span>
+                    Agent Mission Control
+                </Button>
             </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 -mt-8 relative z-20 space-y-12 mb-20">
         
+        {/* Agent Results Section */}
+        {(agentResults.length > 0 || pendingAgents.length > 0) && (
+            <AgentResults results={agentResults} pendingAgents={pendingAgents} />
+        )}
+
         {/* AI Guide Section */}
         {aiGuide && (
             <div className="bg-[#1a0f0a]/90 backdrop-blur-xl border border-[#D4AF37]/30 rounded-2xl shadow-2xl overflow-hidden relative p-8">
@@ -237,6 +289,14 @@ function ShopDetail() {
         <MemoSection placeId={id} />
 
       </div>
+
+      {/* Agent Selector Modal */}
+      {isAgentSelectorOpen && (
+         <AgentSelector 
+            onDeploy={handleDeployAgents}
+            onCancel={() => setIsAgentSelectorOpen(false)}
+         />
+      )}
     </div>
   );
 }

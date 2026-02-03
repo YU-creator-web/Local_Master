@@ -28,23 +28,30 @@ const ParticleGroup = ({ count, size, speedFactor, opacity }: { count: number, s
         mesh.current.rotation.y += 0.0003 * speedFactor;
         mesh.current.rotation.x += 0.0001 * speedFactor;
 
-        const positions = mesh.current.geometry.attributes.position.array as Float32Array;
+        // Access the position attribute
+        // In newer three.js/R3F, attributes might be accessed differently or need explicit typing
+        const geometry = mesh.current.geometry;
+        const positionAttribute = geometry.attributes.position as THREE.BufferAttribute;
         
-        for(let i = 0; i < count; i++) {
-             let y = positions[i * 3 + 1];
-             // Float upward
-             y += speeds[i];
+        if (positionAttribute) {
+             const positions = positionAttribute.array as Float32Array;
              
-             // Wrap around
-             if (y > 7) {
-                 y = -7;
-                 // Randomize x/z slightly on reset to avoid patterns
-                 positions[i * 3] = (Math.random() - 0.5) * 15;
-                 positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+             for(let i = 0; i < count; i++) {
+                  let y = positions[i * 3 + 1];
+                  // Float upward
+                  y += speeds[i];
+                  
+                  // Wrap around
+                  if (y > 7) {
+                      y = -7;
+                      // Randomize x/z slightly on reset to avoid patterns
+                      positions[i * 3] = (Math.random() - 0.5) * 15;
+                      positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+                  }
+                  positions[i * 3 + 1] = y;
              }
-             positions[i * 3 + 1] = y;
+             positionAttribute.needsUpdate = true;
         }
-        mesh.current.geometry.attributes.position.needsUpdate = true;
     }
   });
 

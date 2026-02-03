@@ -8,7 +8,10 @@ import { ThreeCanvas } from '@/components/canvas/Scene';
 import { GoldParticles } from '@/components/canvas/Particles';
 import { CountdownOverlay } from '@/components/ui/CountdownOverlay';
 import { useCourse, Shop } from '@/context/CourseContext';
-import MemoSection from '@/components/shop/MemoSection'; // Import MemoSection
+import MemoSection from '@/components/shop/MemoSection';
+import { AgentSelector } from '@/components/agent/AgentSelector';
+import { AgentResults } from '@/components/agent/AgentResults';
+import { AgentType, AgentResponse } from '@/lib/agents/core';
 
 function SearchResults() {
   const searchParams = useSearchParams();
@@ -16,6 +19,7 @@ function SearchResults() {
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
   const genre = searchParams.get('genre');
+  const mode = searchParams.get('mode');
   const router = useRouter();
   const { addToCourse, removeFromCourse, isInCourse } = useCourse();
 
@@ -73,7 +77,8 @@ function SearchResults() {
         const query = [
             station && `station=${encodeURIComponent(station)}`,
             lat && lng && `lat=${lat}&lng=${lng}`,
-            genre && `genre=${encodeURIComponent(genre)}`
+            genre && `genre=${encodeURIComponent(genre)}`,
+            mode && `mode=${mode}`
         ].filter(Boolean).join('&');
         
         // Save current search URL for "Back" navigation
@@ -84,7 +89,7 @@ function SearchResults() {
     } else {
         setLoading(false);
     }
-  }, [station, lat, lng, genre]);
+  }, [station, lat, lng, genre, mode]);
 
   const handleResearch = () => {
     if (station || (lat && lng)) {
@@ -92,6 +97,7 @@ function SearchResults() {
             station && `station=${encodeURIComponent(station)}`,
             lat && lng && `lat=${lat}&lng=${lng}`,
             genre && `genre=${encodeURIComponent(genre)}`,
+            mode && `mode=${mode}`,
             'force=true'
         ].filter(Boolean).join('&');
         
@@ -113,6 +119,127 @@ function SearchResults() {
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<Record<string, any>>({});
   
+  // Agent State (Per Shop)
+  // Agent State (Per Shop)
+  const [activeAgentShopId, setActiveAgentShopId] = useState<string | null>(null); // To open selector
+  // We keep results state global so they persist  // --- State for Agent Results ---
+  // Load from sessionStorage on mount to persist across navigation
+  const [shopAgentResults, setShopAgentResults] = useState<Record<string, AgentResponse[]>>({});
+  const [shopPendingAgents, setShopPendingAgents] = useState<Record<string, AgentType[]>>({});
+  const [resultModalShopId, setResultModalShopId] = useState<string | null>(null);
+
+  // Restore state from session storage
+  useEffect(() => {
+      const savedResults = sessionStorage.getItem('shinise_agent_results');
+      if (savedResults) {
+          try {
+              setShopAgentResults(JSON.parse(savedResults));
+          } catch (e) {
+              console.error("Failed to parse saved agent results", e);
+          }
+      }
+  }, []);
+
+  // Save state to session storage whenever it changes
+  useEffect(() => {
+      if (Object.keys(shopAgentResults).length > 0) {
+          sessionStorage.setItem('shinise_agent_results', JSON.stringify(shopAgentResults));
+      }
+  }, [shopAgentResults]);
+
+  const handleDeployAgents = (shop: Shop, selected: AgentType[]) => {
+      setActiveAgentShopId(null);
+      setResultModalShopId(shop.id); // Open results modal immediately
+      
+      // Initialize state for this shop if not exists or append? 
+      // User says "Agent Go", implies a new run or adding. Let's merge or reset? 
+      // Ideally reset for fresh run or append. Let's append but filter dupes if needed.
+      // For simplicity/demo: Reset pending, keep old results, add new pending.
+      
+      // Throttled Concurrent Execution (Limit: 3)
+      // Throttled Concurrent Execution (Limit: 3)
+      const CONCURRENCY_LIMIT = 3;
+      const queue = [...selected];
+      
+      // Initialize pending state for all selected agents
+      setShopPendingAgents(prev => ({ 
+          ...prev, 
+          [shop.id]: [...(prev[shop.id] || []), ...selected] 
+      }));
+
+      const processAgent = async (type: AgentType) => {
+        console.log(`[Client Debug] Deploying agent ${type} for shop ${shop.id}`);
+        try {
+            const res = await fetch('/api/agent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    agentType: type,
+                    shopName: shop.displayName.text,
+                    shopAddress: shop.formattedAddress,
+                    shopId: shop.id
+                })
+            });
+            
+            let data: AgentResponse;
+            if (!res.ok) {
+                if (res.status === 429) {
+                    data = {
+                        agentType: type,
+                        agentName: "Error",
+                        icon: "⚠️",
+                        summary: "混雑中",
+                        details: ["アクセス集中により制限されています。少し時間を置いてください。"],
+                        riskLevel: "caution"
+                    }
+                } else {
+                     throw new Error(`API Error: ${res.status}`);
+                }
+            } else {
+                data = await res.json();
+            }
+            
+            setShopAgentResults(prev => ({
+                ...prev,
+                [shop.id]: [...(prev[shop.id] || []), data]
+            }));
+        } catch (e: any) {
+            console.error(`Agent ${type} failed`, e);
+            setShopAgentResults(prev => ({
+                ...prev,
+                [shop.id]: [...(prev[shop.id] || []), {
+                    agentType: type,
+                    agentName: "Error",
+                    icon: "❌",
+                    summary: "通信エラー",
+                    details: [e.message || "不明なエラー"],
+                    riskLevel: "caution"
+                }]
+            }));
+        } finally {
+             // Remove from pending
+             setShopPendingAgents(prev => ({
+                ...prev,
+                [shop.id]: (prev[shop.id] || []).filter(p => p !== type)
+            }));
+        }
+      };
+
+      const worker = async () => {
+          while (queue.length > 0) {
+              const type = queue.shift();
+              if (type) await processAgent(type);
+          }
+      };
+
+      // Launch workers allowed by concurrency limit
+      const workers = Array(Math.min(selected.length, CONCURRENCY_LIMIT))
+          .fill(null)
+          .map(() => worker());
+          
+      // workers continue in background
+  };
+
   // Memo Component Import (Dynamic import to avoid circular dep issues if any, or just regular)
   // We need to import MemoSection at the top file level, but I'll assume it's added.
 
@@ -190,7 +317,9 @@ function SearchResults() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {shops.map((shop) => {
               const inCourse = isInCourse(shop.id);
-              const analysis = analysisResults[shop.id];
+              // const analysis = analysisResults[shop.id]; // Deprecated old analysis
+              const results = shopAgentResults[shop.id] || [];
+              const pending = shopPendingAgents[shop.id] || [];
 
               return (
                 <Card key={shop.id} className="cursor-default bg-white/5 border border-white/10 backdrop-blur-sm overflow-hidden rounded-xl transition-all duration-300 hover:border-[#D4AF37]/30">
@@ -274,7 +403,7 @@ function SearchResults() {
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                             </a>
 
-                            {/* Google Maps (Search by Name) - Fallback to just search query link for simplicity/cost unless we have uri */}
+                            {/* Google Maps */}
                              <a 
                                 href={shop.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shop.formattedAddress + " " + shop.displayName.text)}`}
                                 target="_blank"
@@ -292,33 +421,25 @@ function SearchResults() {
                                 <span>{openMemoId === shop.id ? 'メモを閉じる' : 'メモを書く'}</span>
                             </button>
 
-                            {/* Review Analysis */}
+                            {/* New Agent Mission Control Button */}
                             <button
-                                onClick={(e) => { e.stopPropagation(); handleAnalyze(shop); } } // Pass shop, e is implicit here? Wait, need to fix handleAnalyze signature
-                                disabled={analyzingId === shop.id}
-                                className="flex items-center justify-center gap-1 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs font-bold rounded border border-red-500/30 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); setActiveAgentShopId(shop.id); }}
+                                className="flex items-center justify-center gap-1 py-2 bg-black/40 hover:bg-[#D4AF37]/20 text-[#D4AF37] text-[10px] md:text-xs font-bold rounded border border-[#D4AF37]/50 shadow-[0_0_10px_rgba(212,175,55,0.1)] hover:shadow-[0_0_15px_rgba(212,175,55,0.3)] transition-all animate-pulse hover:animate-none"
                             >
-                                {analyzingId === shop.id ? '分析中...' : 'レビュー分析'}
+                                <span className="mr-1">🕵️‍♀️</span> 作戦会議
                             </button>
+                             {/* View Results Button (if results exist) */}
+                             {(results.length > 0 || pending.length > 0) && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setResultModalShopId(shop.id); }}
+                                    className="flex items-center justify-center gap-1 py-2 bg-[#D4AF37] text-black text-[10px] md:text-xs font-bold rounded border border-[#D4AF37] shadow-lg transition-all col-span-2"
+                                >
+                                    <span>📑 レポートを見る ({results.length}/{results.length + pending.length})</span>
+                                </button>
+                             )}
                         </div>
 
-                        {/* Analysis Result Display */}
-                        {analysis && (
-                            <div className="mt-4 p-3 rounded bg-red-950/20 border border-red-500/30 text-xs text-gray-300 animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className={`font-bold ${analysis.is_suspicious ? 'text-red-400' : 'text-green-400'}`}>
-                                        {analysis.is_suspicious ? '⚠️ サクラの疑いあり' : '✅ 健全な口コミ'}
-                                    </span>
-                                    <span className="text-[10px] opacity-70">AI分析結果</span>
-                                </div>
-                                <p className="mb-2 text-gray-200 font-bold">{analysis.reality_summary}</p>
-                                {analysis.negative_points.length > 0 && (
-                                    <ul className="list-disc list-inside opacity-80 text-[10px] space-y-1">
-                                        {analysis.negative_points.map((p:string, i:number) => <li key={i}>{p}</li>)}
-                                    </ul>
-                                )}
-                            </div>
-                        )}
+
 
                         {/* Memo Section */}
                         {openMemoId === shop.id && (
@@ -333,6 +454,66 @@ function SearchResults() {
             })}
         </div>
       </div>
+
+      {/* Global Agent Selector Modal */}
+      {activeAgentShopId && (() => {
+         const shop = shops.find(s => s.id === activeAgentShopId);
+         if (!shop) return null;
+         return (
+            <AgentSelector 
+                onDeploy={(selected) => handleDeployAgents(shop, selected)}
+                onCancel={() => setActiveAgentShopId(null)}
+            />
+         );
+      })()}
+
+      {/* Global Agent Results Modal */}
+      {resultModalShopId && (() => {
+          const shop = shops.find(s => s.id === resultModalShopId);
+          if (!shop) return null;
+          const results = shopAgentResults[shop.id] || [];
+          const pending = shopPendingAgents[shop.id] || [];
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-300 p-4">
+                 <div className="w-full max-w-5xl bg-[#1a0f0a] border border-[#D4AF37]/50 rounded-2xl max-h-[90vh] flex flex-col shadow-[0_0_50px_rgba(212,175,55,0.2)] overflow-hidden">
+                    {/* Header */}
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#D4AF37]/10">
+                        <div>
+                             <h2 className="text-xl font-bold font-[family-name:var(--font-mincho)] text-white flex items-center gap-2">
+                                <span className="text-2xl">📑</span> Mission Result: {shop.displayName.text}
+                             </h2>
+                        </div>
+                        <button onClick={() => setResultModalShopId(null)} className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors">
+                            ✕
+                        </button>
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-black/20">
+                         <AgentResults results={results} pendingAgents={pending} />
+                         
+                         {/* Empty State */}
+                         {results.length === 0 && pending.length === 0 && (
+                             <div className="text-center py-20 text-gray-500">
+                                 まだエージェントが派遣されていません。
+                             </div>
+                         )}
+                    </div>
+                    
+                    {/* Footer Actions */}
+                    <div className="p-4 border-t border-white/10 bg-[#1a0f0a] flex justify-end gap-4">
+                         <Button onClick={() => { setActiveAgentShopId(shop.id); }} variant="outline" className="border-[#D4AF37] text-[#D4AF37]">
+                             + 追加エージェント派遣
+                         </Button>
+                         <Button onClick={() => setResultModalShopId(null)}>
+                             閉じる
+                         </Button>
+                    </div>
+                 </div>
+            </div>
+          );
+      })()}
     </div>
   );
 }

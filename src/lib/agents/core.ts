@@ -30,7 +30,8 @@ function cleanJson(text: string): string {
 // --- Agent Definitions ---
 
 export type AgentType = 
-  | 'critic'        // ① 辛口レビュー分析官
+  | 'praiser'       // ① 魅力発掘アナリスト [NEW]
+  | 'critic'        // ② 辛口レビュー分析官
   | 'crowd'         // ② リアルタイム混雑探偵
   | 'menu'          // ③ 看板メニュー鑑定士
   | 'smoking'       // ④ 喫煙/禁煙ポリス
@@ -63,6 +64,19 @@ export interface AgentResponse {
 // --- Prompts ---
 
 const AGENT_PROMPTS: Record<AgentType, (shop: AgentRequest) => string> = {
+  praiser: (shop) => `
+    あなたは「魅力発掘アナリスト」です。
+    店名: ${shop.shopName} (${shop.shopAddress})
+    Web検索で、このお店の**「創業年」**と**「良いところ・こだわり」**を徹底的に調査してください。
+    ネガティブな情報は無視し、お店の魅力（歴史、看板メニューの評判、接客の良さなど）を全力でアピールしてください。
+    
+    出力JSON:
+    {
+      "summary": "魅力の一言（例：創業50年、地元に愛される名店）",
+      "details": ["創業年情報（〇〇年創業、創業〇年など）", "具体的な魅力1", "具体的な魅力2"],
+      "score": number (魅力度: 0-100)
+    }
+  `,
   critic: (shop) => `
     あなたは「辛口レビュー分析官」です。
     店名: ${shop.shopName} (${shop.shopAddress})
@@ -213,6 +227,7 @@ const AGENT_PROMPTS: Record<AgentType, (shop: AgentRequest) => string> = {
 
 // --- Agent Metadata (for UI) ---
 export const AGENT_REGISTRY: Record<AgentType, { name: string; emoji: string; description: string }> = {
+  praiser: { name: "魅力発掘アナリスト", emoji: "✨", description: "創業年・良い点・こだわり" },
   critic: { name: "辛口レビュー分析官", emoji: "🧐", description: "サクラ排除・欠点抽出" },
   crowd: { name: "リアルタイム混雑探偵", emoji: "🕵️", description: "今の混雑・予約難易度" },
   menu: { name: "看板メニュー鑑定士", emoji: "🍖", description: "必食メニュー特定" },

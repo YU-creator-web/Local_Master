@@ -143,22 +143,23 @@ export async function GET(request: NextRequest) {
 
       // If AI fails or returns nothing (fallback to old logic / empty)
       if (shopsToCache.length === 0) {
-          // Fallback: regular search but no scoring to save costs? 
-          // Or just return empty to encourage retrying?
-          // Let's do a basic nearby search without expensive AI scoring.
-          console.log("⚠️ AI search returned 0 candidates. Falling back to simple nearby search.");
-          const places = await searchNearby(targetLat, targetLng, baseRadius);
+          console.log("⚠️ AI search returned 0 candidates. Falling back to keyword search.");
           
-          // No AI scoring for fallback to save money
+          // Improved Fallback: Search by text with genre to ensure relevance
+          // e.g. "Asakusa Yakitori"
+          const query = `${cleanStation} ${cleanGenre !== 'all' ? cleanGenre : 'Old Shop'}`;
+          const places = await searchByText(query, targetLat, targetLng, baseRadius);
+          
+          // No AI scoring for fallback to save money, but we provide basic info
            const fallbackShops = places.slice(0, 10).map(place => ({
               ...place,
               aiAnalysis: {
-                  score: 0,
-                  reasoning: "AI検索で候補が見つかりませんでした",
-                  short_summary: "情報なし",
+                  score: 50, // Give a neutral score
+                  reasoning: "AIによる厳選候補が見つかりませんでしたが、条件に合うお店を表示します。",
+                  short_summary: "キーワード検索結果",
                   is_shinise: false,
                   founding_year: "-",
-                  tabelog_rating: 0
+                  tabelog_rating: place.rating || 0
               }
           }));
           shopsToCache.push(...fallbackShops);

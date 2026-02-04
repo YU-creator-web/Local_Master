@@ -47,3 +47,6 @@ next-env.d.ts
 # archives
 /_archive/
 GEMINI.md
+docs/
+test/
+draft_zenn.md

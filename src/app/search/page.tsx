@@ -27,7 +27,7 @@ function SearchResults() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Function to process JSON response
+  // Function to process JSON response (Streaming Keep-Alive Supported)
   const fetchSearch = async (url: string) => {
     setLoading(true);
     setError('');
@@ -45,12 +45,47 @@ function SearchResults() {
 
     try {
         const response = await fetch(url);
+        
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch shops');
+            let errorMsg = 'Failed to fetch shops';
+            try {
+                // Try to parse error json if possible, or fallback
+                // clone() might be needed if body is used, but for error cases typically fine
+                const errorData = await response.json(); 
+                errorMsg = errorData.error || errorMsg;
+            } catch (e) {
+                // ignore
+            }
+            throw new Error(errorMsg);
         }
         
-        const data = await response.json();
+        if (!response.body) throw new Error("No response body");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let result = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const text = decoder.decode(value, { stream: true });
+            result += text;
+            
+            // The server sends " " (space) as heartbeat.
+            // We just accumulate it. The final JSON parse will ignore whitespace.
+        }
+        
+        const jsonString = result.trim();
+        
+        if (!jsonString) {
+             console.warn("Empty response from search API");
+             setShops([]);
+             setLoading(false);
+             return;
+        }
+
+        const data = JSON.parse(jsonString);
         
         if (data.shops) {
             setShops(data.shops);
@@ -199,23 +234,32 @@ function SearchResults() {
                 data = await res.json();
             }
             
-            setShopAgentResults(prev => ({
-                ...prev,
-                [shop.id]: [...(prev[shop.id] || []), data]
-            }));
+            setShopAgentResults(prev => {
+                const current = prev[shop.id] || [];
+                // Remove existing result of same type
+                const filtered = current.filter(item => item.agentType !== type);
+                return {
+                    ...prev,
+                    [shop.id]: [...filtered, data]
+                };
+            });
         } catch (e: any) {
             console.error(`Agent ${type} failed`, e);
-            setShopAgentResults(prev => ({
-                ...prev,
-                [shop.id]: [...(prev[shop.id] || []), {
-                    agentType: type,
-                    agentName: "Error",
-                    icon: "❌",
-                    summary: "通信エラー",
-                    details: [e.message || "不明なエラー"],
-                    riskLevel: "caution"
-                }]
-            }));
+            setShopAgentResults(prev => {
+                const current = prev[shop.id] || [];
+                const filtered = current.filter(item => item.agentType !== type);
+                return {
+                    ...prev,
+                    [shop.id]: [...filtered, {
+                        agentType: type,
+                        agentName: "Error",
+                        icon: "❌",
+                        summary: "通信エラー",
+                        details: [e.message || "不明なエラー"],
+                        riskLevel: "caution"
+                    }]
+                };
+            });
         } finally {
              // Remove from pending
              setShopPendingAgents(prev => ({

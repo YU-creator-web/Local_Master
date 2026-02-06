@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ローカルMaster（Local Master）
 
-## Getting Started
+地域活性化・オーバーツーリズムを  
+**AIエージェント × 地図 × 選択体験**で解決する  
+体験型グルメ探索アプリです。
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## コンセプト
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+観光地では、  
+**地域密着の良い店が他にもあるにもかかわらず、  
+一部の有名店に人が一点集中してしまう**という問題があります。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+ローカルMasterは、  
+評価点数やランキングに依存しない「選択体験」を提供することで、  
+この一点集中の構造を崩すことを目的としています。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 主な特徴
 
-To learn more about Next.js, take a look at the following resources:
+### 🧭 冒険モード
+- グルメサイトの評価や順位を主軸にしない探索モード
+- レビューの文脈や Web 上の体験談を AI が分析
+- 一点集中しにくいが、体験価値の高い店舗を提案
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 🤖 選択型 AI エージェント（最大12）
 
-## Deploy on Vercel
+- 12人の専門 AI エージェントを用意
+- ユーザーが **必要なエージェントだけを選択**
+- 選ばれたエージェントを **並列実行**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### エージェント例
+- 魅力発掘アナリスト：歴史・背景・こだわり
+- 辛口レビュー分析官：過剰評価・サクラ排除
+- 日本酒愛好家：地酒・品揃え評価
+- 地雷回避コンサルタント：接客・提供リスク
+- デート適正診断士：雰囲気・距離感
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+👉 単一の評価軸ではなく、  
+**複数の視点を束ねた判断**を生成します。
+
+---
+
+### 🗺️ 地図ベースの体験設計
+- Google Maps API を利用
+- 店舗を地理的に可視化
+- AI の提案結果を「地図上の選択肢」として表示
+
+👉 店舗の集中・分散を **空間的に理解できる UI** を実装しています。
+
+---
+
+## 技術スタック
+
+### フロントエンド
+- Next.js（App Router）
+- TypeScript
+- Google Maps JavaScript API
+
+### バックエンド / API
+- Next.js API Routes
+- AI エージェント選択・並列実行制御
+
+### AI / LLM
+- Google Vertex AI（Gemini 系モデル）
+- Google Search Grounding（Web 情報参照）
+
+### データストア / キャッシュ
+- Firebase Firestore  
+  - AI エージェント分析結果のキャッシュ
+  - 再実行コスト・レスポンス時間の削減
+
+### インフラ
+- Google Cloud
+- サーバーレス構成
+
+---
+
+## アーキテクチャ概要
+
+1. ユーザーがエリア・ジャンル・冒険モードを選択
+2. 必要な AI エージェントを選択
+3. 選択されたエージェントを並列実行
+4. Web 情報・レビューを分析
+5. Firestore に結果をキャッシュ
+6. 地図 UI とともに結果を表示
+
+---
+
+## このプロジェクトが目指すもの
+
+ローカルMasterは、  
+「良い店を当てる」アプリではありません。
+
+- 選択が一部に集中する構造を  
+- 複数の納得できる選択肢に分散させる  
+
+その結果として、
+- 観光体験の質向上
+- 混雑・行列の緩和
+- 地域全体の活性化  
+
+を実現することを目指しています。
+
+---

@@ -231,7 +231,22 @@ function SearchResults() {
                      throw new Error(`API Error: ${res.status}`);
                 }
             } else {
-                data = await res.json();
+                // Handle Streaming Keep-Alive
+                if (!res.body) throw new Error("No response body");
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let result = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    result += decoder.decode(value, { stream: true });
+                }
+                
+                const jsonString = result.trim();
+                if (!jsonString) throw new Error("Empty response");
+                
+                data = JSON.parse(jsonString);
             }
             
             setShopAgentResults(prev => {
